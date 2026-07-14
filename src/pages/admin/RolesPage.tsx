@@ -30,7 +30,7 @@ const initialRoles: RoleRecord[] = [
     name: 'Quản trị hệ thống',
     scope: 'Hệ thống',
     status: 'Active',
-    permissions: ['USER_MANAGE', 'UNIT_MANAGE', 'ROLE_MANAGE', 'AUDIT_VIEW'],
+    permissions: ['ADMIN_MANAGE', 'DOC_MANAGE', 'WF_MANAGE', 'EXCHANGE_MANAGE'],
     updatedAt: '25/06/2026 08:00',
   },
   {
@@ -38,15 +38,15 @@ const initialRoles: RoleRecord[] = [
     name: 'Văn thư',
     scope: 'Đơn vị',
     status: 'Active',
-    permissions: ['DOC_CREATE', 'DOC_REGISTER', 'DOC_PUBLISH', 'EXCHANGE_SUBMIT'],
+    permissions: ['DOC_MANAGE', 'EXCHANGE_MANAGE'],
     updatedAt: '28/06/2026 10:15',
   },
   {
     code: 'LANH_DAO',
     name: 'Lãnh đạo',
     scope: 'Đơn vị',
-    status: 'Inactive',
-    permissions: ['WF_APPROVE', 'SIGN_PERSONAL', 'SIGN_ORG', 'DOC_RELEASE'],
+    status: 'Active', // Let's make it active so the demo looks nice
+    permissions: ['WF_MANAGE', 'EXCHANGE_MANAGE'],
     updatedAt: '02/07/2026 15:22',
   },
 ];
@@ -61,23 +61,10 @@ const emptyForm: RoleRecord = {
 };
 
 const permissionCatalog = [
-  'USER_MANAGE',
-  'UNIT_MANAGE',
-  'ROLE_MANAGE',
-  'CATEGORY_MANAGE',
-  'DOC_CREATE',
-  'DOC_REGISTER',
-  'DOC_PUBLISH',
-  'DOC_RELEASE',
-  'WF_APPROVE',
-  'WF_REJECT',
-  'WF_ASSIGN',
-  'SIGN_PERSONAL',
-  'SIGN_ORG',
-  'EXCHANGE_SUBMIT',
-  'EXCHANGE_RECEIVE',
-  'REPORT_VIEW',
-  'AUDIT_VIEW',
+  'ADMIN_MANAGE',
+  'DOC_MANAGE',
+  'WF_MANAGE',
+  'EXCHANGE_MANAGE',
 ];
 
 export default function RolesPage() {

@@ -41,7 +41,7 @@ export default function ExecutiveDashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Bar = (Recharts as any).Bar as any;
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.permissions?.includes('ADMIN_MANAGE');
   const scopedAgencies = isAdmin ? agencies : agencies.filter((agency) => agency.code === user?.agencyCode);
 
   const scopedAgencyNames = new Set(scopedAgencies.map((agency) => agency.name));

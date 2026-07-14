@@ -1,11 +1,14 @@
 import { NavListProps, NavSectionProps } from '../../../components/nav-section/types';
-import { hasPermissions } from '../../../auth/permissions';
+import { hasPermissions, PATH_PERMISSIONS } from '../../../auth/permissions';
 
 function filterItem(item: NavListProps, userPermissions: string[] | undefined | null): NavListProps | null {
+  // Auto lookup permissions for this path from the central configuration
+  const required = PATH_PERMISSIONS[item.path];
+  
   const allowed = hasPermissions({
     userPermissions,
-    required: item.permissions,
-    mode: item.permissionMode ?? 'any',
+    required,
+    mode: 'any',
   });
 
   if (!allowed) return null;

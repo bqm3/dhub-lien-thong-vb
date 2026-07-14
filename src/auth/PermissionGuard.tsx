@@ -5,7 +5,7 @@ import { Container, Typography } from '@mui/material';
 import { ForbiddenIllustration } from '../assets/illustrations';
 // auth
 import { useAuthContext } from './useAuthContext';
-import { hasPermissions, PermissionCheckMode, PermissionCode } from './permissions';
+import { hasPermissions, PermissionCheckMode, PermissionCode, PATH_PERMISSIONS } from './permissions';
 
 type PermissionGuardProps = {
   children: ReactNode;
@@ -45,5 +45,18 @@ export default function PermissionGuard({
   }
 
   return <>{children}</>;
+}
+
+type GuardedPageProps = {
+  path: string;
+  element: ReactNode;
+};
+
+export function GuardedPage({ path, element }: GuardedPageProps) {
+  const required = PATH_PERMISSIONS[path];
+  if (!required) {
+    return <>{element}</>;
+  }
+  return <PermissionGuard required={required}>{element}</PermissionGuard>;
 }
 

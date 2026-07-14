@@ -8,7 +8,7 @@ export default function LoginPage() {
   return (
     <>
       <Helmet>
-        <title> Login | Minimal UI</title>
+        <title>Đăng nhập | Trục liên thông văn bản</title>
       </Helmet>
 
       <Login />

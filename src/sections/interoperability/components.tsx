@@ -65,6 +65,7 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
               p: 3,
               borderRadius: 3,
               color: 'common.white',
+              textAlign: 'center',
               background:
                 'linear-gradient(135deg, rgba(12,52,87,1) 0%, rgba(24,97,140,1) 55%, rgba(59,154,191,1) 100%)',
               boxShadow: (theme) => theme.shadows[12],
@@ -76,7 +77,7 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
             <Typography variant="h3" sx={{ mt: 1, mb: 1 }}>
               {title}
             </Typography>
-            <Typography variant="body1" sx={{ maxWidth: 860, opacity: 0.88 }}>
+            <Typography variant="body1" sx={{ maxWidth: 860, mx: 'auto', opacity: 0.88 }}>
               {subtitle}
             </Typography>
           </Box>

@@ -4,6 +4,7 @@ import axios from '../utils/axios';
 //
 import { isValidToken, setSession } from './utils';
 import { ActionMapType, AuthStateType, AuthUserType, JWTContextType } from './types';
+import { ROLE_PERMISSIONS } from './permissions';
 
 // ----------------------------------------------------------------------
 
@@ -89,54 +90,18 @@ type AuthProviderProps = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const buildDemoUser = (args?: { role?: 'ADMIN' | 'MANAGER'; agencyCode?: string; email?: string; name?: string }) => {
+  const buildDemoUser = (args?: { role?: 'ADMIN' | 'MANAGER' | 'CLERK' | 'LEADER'; agencyCode?: string; email?: string; name?: string }) => {
     const role = args?.role ?? 'ADMIN';
-    const email = args?.email ?? (role === 'ADMIN' ? 'admin@local' : 'manager@local');
-    const name = args?.name ?? (role === 'ADMIN' ? 'System Admin' : 'Project Manager');
-    const agencyCode = args?.agencyCode ?? (role === 'MANAGER' ? 'SO_NOI_VU' : undefined);
+    const email = args?.email ?? 'admin@local';
+    const name = args?.name ?? 'System Admin';
+    const agencyCode = args?.agencyCode ?? (role === 'CLERK' ? 'SO_THONG_TIN' : 'SO_NOI_VU');
 
-    const adminPermissions = [
-      'USER_MANAGE',
-      'UNIT_MANAGE',
-      'ROLE_MANAGE',
-      'CATEGORY_MANAGE',
-      'DOC_CREATE',
-      'DOC_REGISTER',
-      'DOC_PUBLISH',
-      'DOC_RELEASE',
-      'WF_APPROVE',
-      'WF_REJECT',
-      'WF_ASSIGN',
-      'SIGN_PERSONAL',
-      'SIGN_ORG',
-      'EXCHANGE_SUBMIT',
-      'EXCHANGE_RECEIVE',
-      'REPORT_VIEW',
-      'AUDIT_VIEW',
-    ];
-
-    const managerPermissions = [
-      'DOC_CREATE',
-      'DOC_REGISTER',
-      'DOC_PUBLISH',
-      'DOC_RELEASE',
-      'WF_APPROVE',
-      'WF_REJECT',
-      'WF_ASSIGN',
-      'SIGN_PERSONAL',
-      'SIGN_ORG',
-      'EXCHANGE_SUBMIT',
-      'EXCHANGE_RECEIVE',
-      'REPORT_VIEW',
-    ];
-
-    const permissions = role === 'ADMIN' ? adminPermissions : managerPermissions;
+    const permissions = ROLE_PERMISSIONS[role] || [];
 
     return {
-      id: role === 'ADMIN' ? 'demo-admin' : 'demo-manager',
+      id: `demo-${role.toLowerCase()}`,
       role,
       agencyCode,
-      // keep both shapes to satisfy existing UI components
       avatar: '/assets/images/avatars/avatar_default.jpg',
       photoURL: '/assets/images/avatars/avatar_default.jpg',
       email,
@@ -201,20 +166,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const normalizedEmail = (email || '').trim().toLowerCase();
 
     // Fake accounts for UI + permissions testing (until BE is ready)
-    // - admin@local / admin123  -> full permissions
-    // - manager@local / manager123 -> no system admin perms
     if (normalizedEmail === 'admin@local' && password === 'admin123') {
       // ok
     } else if (normalizedEmail === 'manager@local' && password === 'manager123') {
       // ok
+    } else if (normalizedEmail === 'vanthu@local' && password === 'vanthu123') {
+      // ok
+    } else if (normalizedEmail === 'lanhdao@local' && password === 'lanhdao123') {
+      // ok
     } else {
-      throw new Error('Sai tài khoản/mật khẩu demo. Dùng admin@local/admin123 hoặc manager@local/manager123');
+      throw new Error('Sai tài khoản/mật khẩu demo. Dùng admin@local/admin123, vanthu@local/vanthu123 hoặc lanhdao@local/lanhdao123');
     }
 
-    const user =
-      normalizedEmail === 'manager@local'
-        ? buildDemoUser({ role: 'MANAGER', email: 'manager@local', name: 'Project Manager', agencyCode: 'SO_NOI_VU' })
-        : buildDemoUser({ role: 'ADMIN', email: 'admin@local', name: 'System Admin' });
+    let user;
+    if (normalizedEmail === 'admin@local') {
+      user = buildDemoUser({ role: 'ADMIN', email: 'admin@local', name: 'Quản trị hệ thống' });
+    } else if (normalizedEmail === 'vanthu@local') {
+      user = buildDemoUser({ role: 'CLERK', email: 'vanthu@local', name: 'Văn thư cơ quan', agencyCode: 'SO_THONG_TIN' });
+    } else if (normalizedEmail === 'lanhdao@local') {
+      user = buildDemoUser({ role: 'LEADER', email: 'lanhdao@local', name: 'Lãnh đạo đơn vị' });
+    } else {
+      user = buildDemoUser({ role: 'LEADER', email: 'manager@local', name: 'Lãnh đạo đơn vị' });
+    }
 
     const accessToken = 'demoAccessToken1234567890';
 
