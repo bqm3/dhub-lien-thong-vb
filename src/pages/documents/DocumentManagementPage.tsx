@@ -1,4 +1,5 @@
-import { ChangeEvent, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { useSnackbar } from 'notistack';
 import {
   Alert,
   Box,
@@ -68,6 +69,60 @@ const initialDocuments: ManagedDocumentRecord[] = documents.map((doc, index) => 
   signedPositions: doc.status === 'Đã phát hành' ? 2 : index % 2 === 0 ? 1 : 0,
 }));
 
+function pad2(value: number) {
+  return value < 10 ? `0${value}` : String(value);
+}
+
+function formatDocumentDate(input: Date | number | string) {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return String(input);
+
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())} ${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
+}
+
+function normalizeManagedDocument(input: Partial<ManagedDocumentRecord>): ManagedDocumentRecord | null {
+  if (!input.code || !input.title || !input.sender || !input.receiver) return null;
+
+  const normalizedCreatedAt = input.createdAt
+    ? formatDocumentDate(parseDocumentDate(String(input.createdAt)))
+    : formatDocumentDate(new Date());
+
+  return {
+    code: String(input.code),
+    title: String(input.title),
+    type: String(input.type ?? 'CONG_VAN'),
+    sender: String(input.sender),
+    receiver: String(input.receiver),
+    version: String(input.version ?? 'v1'),
+    classification: String(input.classification ?? 'Thường'),
+    status: String(input.status ?? 'Đang xử lý'),
+    createdAt: normalizedCreatedAt,
+    attachments: Array.isArray(input.attachments) ? input.attachments.map((x) => String(x)) : [],
+    signProvider: String(input.signProvider ?? 'USB Token / HSM'),
+    signStatus: String(input.signStatus ?? 'Chưa ký'),
+    signedPositions: Number.isFinite(input.signedPositions) ? Number(input.signedPositions) : 0,
+  };
+}
+
+function parseDocumentDate(value: string) {
+  const trimmed = value.trim();
+  const isoTime = Date.parse(trimmed);
+  if (!Number.isNaN(isoTime)) return isoTime;
+
+  const match = trimmed.match(
+    /^(?:(\d{1,2}):(\d{2})(?::(\d{2}))?[,\s]+)?(\d{1,2})\/(\d{1,2})\/(\d{4})$|^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+  if (!match) return 0;
+
+  if (match[1] || match[4]) {
+    const [, hh = '0', min = '0', ss = '0', dd = '1', mm = '1', yyyy = '1970'] = match;
+    return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss)).getTime();
+  }
+
+  const [, , , , , , dd = '1', mm = '1', yyyy = '1970', hh = '0', min = '0', ss = '0'] = match;
+  return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss)).getTime();
+}
+
 function fakeVersions(doc: ManagedDocumentRecord) {
   const n = parseInt(doc.version.replace('v', ''), 10);
   return Array.from({ length: n }, (_, i) => ({
@@ -101,19 +156,86 @@ export default function DocumentManagementPage() {
   const [openSignDialog, setOpenSignDialog] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ManagedDocumentRecord>(emptyDocumentForm);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [formAttachmentPreviewUrl, setFormAttachmentPreviewUrl] = useState<string | undefined>(undefined);
   const [detailDoc, setDetailDoc] = useState<ManagedDocumentRecord | null>(null);
   const [detailTab, setDetailTab] = useState(0);
+  const { enqueueSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSavedDocuments() {
+      try {
+        const resp = await fetch('/api/demo-documents');
+        if (!resp.ok) return;
+        const payload = await resp.json();
+        const savedDocsRaw = Array.isArray(payload?.documents) ? payload.documents : [];
+        const savedDocs: ManagedDocumentRecord[] = savedDocsRaw
+          .map((item: Partial<ManagedDocumentRecord>) => normalizeManagedDocument(item))
+          .filter((item: ManagedDocumentRecord | null): item is ManagedDocumentRecord => Boolean(item));
+
+        if (!mounted || savedDocs.length === 0) return;
+
+        setDocumentList((prev) => {
+          const byCode = new Map<string, ManagedDocumentRecord>();
+          prev.forEach((doc) => byCode.set(doc.code, doc));
+          savedDocs.forEach((doc) => byCode.set(doc.code, doc));
+          return Array.from(byCode.values());
+        });
+      } catch {
+        // Keep UI usable even if demo endpoint is unavailable.
+      }
+    }
+
+    loadSavedDocuments();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!detailDoc) return;
+    const latest = documentList.find((doc) => doc.code === detailDoc.code);
+    if (!latest) {
+      setDetailDoc(null);
+      return;
+    }
+    if (latest !== detailDoc) {
+      setDetailDoc(latest);
+    }
+  }, [detailDoc, documentList]);
+
+  useEffect(() => {
+    const currentAttachment = formValues.attachments[0];
+    const file = currentAttachment ? attachmentFiles.find((item) => item.name === currentAttachment) : undefined;
+
+    if (!file) {
+      setFormAttachmentPreviewUrl(undefined);
+      return undefined;
+    }
+
+    const nextUrl = URL.createObjectURL(file);
+    setFormAttachmentPreviewUrl(nextUrl);
+
+    return () => {
+      URL.revokeObjectURL(nextUrl);
+    };
+  }, [attachmentFiles, formValues.attachments]);
 
   const filteredDocuments = useMemo(
     () =>
-      documentList.filter(
-        (d) =>
-          (typeFilter === '' || d.type === typeFilter) &&
-          (d.code.toLowerCase().includes(keyword.toLowerCase()) ||
-            d.title.toLowerCase().includes(keyword.toLowerCase()) ||
-            d.sender.toLowerCase().includes(keyword.toLowerCase()) ||
-            d.receiver.toLowerCase().includes(keyword.toLowerCase()))
-      ),
+      [...documentList]
+        .filter(
+          (d) =>
+            (typeFilter === '' || d.type === typeFilter) &&
+            (d.code.toLowerCase().includes(keyword.toLowerCase()) ||
+              d.title.toLowerCase().includes(keyword.toLowerCase()) ||
+              d.sender.toLowerCase().includes(keyword.toLowerCase()) ||
+              d.receiver.toLowerCase().includes(keyword.toLowerCase()))
+        )
+        .sort((a, b) => parseDocumentDate(b.createdAt) - parseDocumentDate(a.createdAt)),
     [documentList, keyword, typeFilter]
   );
 
@@ -135,7 +257,7 @@ export default function DocumentManagementPage() {
     createdAt: d.createdAt,
     actions: (
       <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <Button size="small" variant="outlined" onClick={() => { setDetailDoc(d); setDetailTab(0); }}>
+        <Button size="small" variant="outlined" onClick={() => handleOpenDetail(d.code)}>
           Chi tiết
         </Button>
         <Button size="small" onClick={() => handleEdit(d)}>Sửa</Button>
@@ -146,10 +268,11 @@ export default function DocumentManagementPage() {
 
   function handleOpenCreate() {
     setEditingCode(null);
+    setAttachmentFiles([]);
     setFormValues({
       ...emptyDocumentForm,
       code: `VB-2026-${String(Date.now()).slice(-6)}`,
-      createdAt: new Date().toLocaleString('vi-VN'),
+      createdAt: formatDocumentDate(new Date()),
     });
     setOpenForm(true);
   }
@@ -157,6 +280,7 @@ export default function DocumentManagementPage() {
   function handleEdit(d: ManagedDocumentRecord) {
     setEditingCode(d.code);
     setFormValues(d);
+    setAttachmentFiles([]);
     setOpenForm(true);
   }
 
@@ -164,12 +288,29 @@ export default function DocumentManagementPage() {
     setDocumentList((prev) => prev.filter((d) => d.code !== code));
   }
 
+  function handleOpenDetail(code: string) {
+    const doc = documentList.find((item) => item.code === code);
+    if (!doc) return;
+    setDetailDoc(doc);
+    setDetailTab(0);
+  }
+
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).map((file) => file.name);
-    setFormValues((prev) => ({
-      ...prev,
-      attachments: [...prev.attachments, ...files],
-    }));
+    const newFiles = Array.from(event.target.files ?? []);
+    if (newFiles.length === 0) return;
+
+    setAttachmentFiles((prev) => {
+      const existing = new Set(prev.map((f) => f.name));
+      const toAdd = newFiles.filter((f) => !existing.has(f.name));
+      return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+    });
+
+    setFormValues((prev) => {
+      const existing = new Set(prev.attachments);
+      const toAddNames = newFiles.map((f) => f.name).filter((n) => !existing.has(n));
+      return toAddNames.length > 0 ? { ...prev, attachments: [...prev.attachments, ...toAddNames] } : prev;
+    });
+
     event.target.value = '';
   }
 
@@ -178,6 +319,7 @@ export default function DocumentManagementPage() {
       ...prev,
       attachments: prev.attachments.filter((item) => item !== fileName),
     }));
+    setAttachmentFiles((prev) => prev.filter((f) => f.name !== fileName));
   }
 
   function handleOpenSignStudio() {
@@ -185,16 +327,79 @@ export default function DocumentManagementPage() {
     setOpenSignDialog(true);
   }
 
-  function handleSubmit() {
-    if (!formValues.code || !formValues.title || !formValues.sender || !formValues.receiver || formValues.attachments.length === 0) return;
+  function arrayBufferToBase64(buffer: ArrayBuffer) {
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const slice = bytes.subarray(i, i + chunkSize);
+      let chunkBinary = '';
+      for (let j = 0; j < slice.length; j += 1) {
+        chunkBinary += String.fromCharCode(slice[j]);
+      }
+      binary += chunkBinary;
+    }
+    return btoa(binary);
+  }
 
-    if (editingCode) {
-      setDocumentList((prev) => prev.map((d) => (d.code === editingCode ? formValues : d)));
-    } else {
-      setDocumentList((prev) => [formValues, ...prev]);
+  async function fileToBase64(file: File) {
+    const buf = await file.arrayBuffer();
+    return arrayBufferToBase64(buf);
+  }
+
+  function getDemoAttachmentUrl(code: string, fileName?: string) {
+    if (!fileName) return undefined;
+    return `/api/demo-documents/file?code=${encodeURIComponent(code)}&fileName=${encodeURIComponent(fileName)}`;
+  }
+
+  async function saveDocumentToDemoStorage(
+    document: ManagedDocumentRecord,
+    attachmentsPayload: { fileName: string; contentType: string; base64: string }[] = []
+  ) {
+    const resp = await fetch('/api/demo-documents/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        document,
+        attachments: attachmentsPayload,
+      }),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(text || `HTTP ${resp.status}`);
     }
 
-    setOpenForm(false);
+    return resp.json();
+  }
+
+  async function handleSubmit() {
+    if (!formValues.code || !formValues.title || !formValues.sender || !formValues.receiver || formValues.attachments.length === 0) return;
+
+    try {
+      const attachmentsPayload = await Promise.all(
+        attachmentFiles.map(async (file) => ({
+          fileName: file.name,
+          contentType: file.type || 'application/octet-stream',
+          base64: await fileToBase64(file),
+        }))
+      );
+
+      const saved = await saveDocumentToDemoStorage(formValues, attachmentsPayload);
+
+      if (editingCode) {
+        setDocumentList((prev) => prev.map((d) => (d.code === editingCode ? formValues : d)));
+      } else {
+        setDocumentList((prev) => [formValues, ...prev]);
+      }
+
+      setOpenForm(false);
+      setAttachmentFiles([]);
+      enqueueSnackbar(`Đã lưu demo: ${saved?.savedTo ?? 'OK'}`, { variant: 'success' });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Lỗi không xác định';
+      enqueueSnackbar(`Lưu demo thất bại: ${message}`, { variant: 'error' });
+    }
   }
 
   return (
@@ -331,7 +536,7 @@ export default function DocumentManagementPage() {
         </Stack>
       </SectionCard>
 
-      <Dialog open={Boolean(detailDoc)} onClose={() => setDetailDoc(null)} fullWidth maxWidth="md">
+      <Dialog open={Boolean(detailDoc)} onClose={() => setDetailDoc(null)} fullWidth maxWidth="xl">
         {detailDoc && (
           <>
             <DialogTitle>
@@ -348,6 +553,7 @@ export default function DocumentManagementPage() {
               <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 2 }}>
                 <Tab label="Metadata" icon={<Iconify icon="solar:document-text-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
                 <Tab label="Attachment" icon={<Iconify icon="solar:paperclip-2-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
+                <Tab label="Ký số" icon={<Iconify icon="solar:shield-check-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
                 <Tab label="Version" icon={<Iconify icon="solar:history-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
                 <Tab label="Audit Trail" icon={<Iconify icon="solar:clipboard-list-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
               </Tabs>
@@ -400,6 +606,40 @@ export default function DocumentManagementPage() {
               )}
 
               {detailTab === 2 && (
+                <Stack spacing={2}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
+                    <Typography variant="subtitle2">Giao diện ký số văn bản</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Nhà cung cấp: {detailDoc.signProvider} | Trạng thái: {detailDoc.signStatus} | Vị trí ký: {detailDoc.signedPositions}
+                    </Typography>
+                  </Box>
+
+                  <SignatureStudio
+                    fileName={detailDoc.attachments[0]}
+                    fileUrl={getDemoAttachmentUrl(detailDoc.code, detailDoc.attachments[0])}
+                    onSignComplete={async (signatures) => {
+                      const updatedDoc: ManagedDocumentRecord = {
+                        ...detailDoc,
+                        signStatus: 'Đã ký số',
+                        status: detailDoc.status === 'Đang xử lý' ? 'Chờ ký số' : detailDoc.status,
+                        signedPositions: signatures.length,
+                      };
+
+                      try {
+                        await saveDocumentToDemoStorage(updatedDoc);
+                        setDocumentList((prev) => prev.map((doc) => (doc.code === updatedDoc.code ? updatedDoc : doc)));
+                        setDetailDoc(updatedDoc);
+                        enqueueSnackbar('Đã cập nhật trạng thái ký số cho văn bản', { variant: 'success' });
+                      } catch (e) {
+                        const message = e instanceof Error ? e.message : 'Lỗi không xác định';
+                        enqueueSnackbar(`Cập nhật ký số thất bại: ${message}`, { variant: 'error' });
+                      }
+                    }}
+                  />
+                </Stack>
+              )}
+
+              {detailTab === 3 && (
                 <DataTable
                   columns={[
                     { key: 'version', label: 'Phiên bản', align: 'center' },
@@ -411,7 +651,7 @@ export default function DocumentManagementPage() {
                 />
               )}
 
-              {detailTab === 3 && (
+              {detailTab === 4 && (
                 <DataTable
                   columns={[
                     { key: 'action', label: 'Hành động' },
@@ -525,7 +765,7 @@ export default function DocumentManagementPage() {
                     </Button>
                   </Stack>
 
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
                     {formValues.attachments.length > 0 ? (
                       formValues.attachments.map((file) => (
                         <Chip key={file} label={file} onDelete={() => handleRemoveAttachment(file)} variant="outlined" />
@@ -566,7 +806,14 @@ export default function DocumentManagementPage() {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenForm(false)}>Hủy</Button>
+          <Button
+            onClick={() => {
+              setOpenForm(false);
+              setAttachmentFiles([]);
+            }}
+          >
+            Hủy
+          </Button>
           <Button variant="contained" onClick={handleSubmit}>Lưu</Button>
         </DialogActions>
       </Dialog>
@@ -586,6 +833,7 @@ export default function DocumentManagementPage() {
         <DialogContent dividers>
           <SignatureStudio
             fileName={formValues.attachments[0]}
+            fileUrl={formAttachmentPreviewUrl ?? getDemoAttachmentUrl(formValues.code, formValues.attachments[0])}
             onSignComplete={(signatures) => {
               setFormValues((prev) => ({
                 ...prev,
