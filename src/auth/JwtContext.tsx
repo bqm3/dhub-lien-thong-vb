@@ -189,7 +189,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       user = buildDemoUser({ role: 'LEADER', email: 'manager@local', name: 'Lãnh đạo đơn vị' });
     }
 
-    const accessToken = 'demoAccessToken1234567890';
+    // JWT demo: header.payload.signature — exp = year 2099 (4070908800)
+    // payload: { "sub": "demo", "exp": 4070908800 }
+    const accessToken =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW1vIiwiZXhwIjo0MDcwOTA4ODAwfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
 
     setSession(accessToken);
     localStorage.setItem('accessToken', accessToken);

@@ -14,7 +14,7 @@ export const PATH_AUTH = {
 
 export const PATH_DASHBOARD = {
   root: ROOTS_DASHBOARD,
-  overview: path(ROOTS_DASHBOARD, '/overview'),
+  overview: path(ROOTS_DASHBOARD, '/operations/reporting/executive'),
   integration: path(ROOTS_DASHBOARD, '/integration-management'),
   documents: path(ROOTS_DASHBOARD, '/document-management'),
   admin: {
@@ -66,7 +66,19 @@ export const PATH_DASHBOARD = {
   operations: {
     root: path(ROOTS_DASHBOARD, '/operations'),
     exchange: path(ROOTS_DASHBOARD, '/operations/document-exchange'),
-    reporting: path(ROOTS_DASHBOARD, '/operations/reporting'),
+    reporting: {
+      root: path(ROOTS_DASHBOARD, '/operations/reporting'),
+      executive: path(ROOTS_DASHBOARD, '/operations/reporting/executive'),
+      document: path(ROOTS_DASHBOARD, '/operations/reporting/document'),
+      incoming: path(ROOTS_DASHBOARD, '/operations/reporting/incoming'),
+      type: path(ROOTS_DASHBOARD, '/operations/reporting/type'),
+      delivery: path(ROOTS_DASHBOARD, '/operations/reporting/delivery'),
+      error: path(ROOTS_DASHBOARD, '/operations/reporting/error'),
+      retry: path(ROOTS_DASHBOARD, '/operations/reporting/retry'),
+      agency: path(ROOTS_DASHBOARD, '/operations/reporting/agency'),
+      daily: path(ROOTS_DASHBOARD, '/operations/reporting/daily'),
+      export: path(ROOTS_DASHBOARD, '/operations/reporting/export'),
+    },
     api: path(ROOTS_DASHBOARD, '/operations/sample-api'),
   },
 };

@@ -1,4 +1,4 @@
-// Quản lý văn bản
+// QuÃ¡ÂºÂ£n lÃƒÂ½ vÃ„Æ’n bÃ¡ÂºÂ£n
 export type OutgoingDoc = {
   code: string;
   title: string;
@@ -7,6 +7,9 @@ export type OutgoingDoc = {
   urgency: string;
   status: string;
   createdAt: string;
+  attachments?: string[];
+  signProvider?: string;
+  signStatus?: string;
 };
 
 export type IncomingDoc = {
@@ -16,6 +19,7 @@ export type IncomingDoc = {
   assignedTo: string;
   deadline: string;
   status: string;
+  attachments?: string[];
 };
 
 export type InternalDoc = {
@@ -25,6 +29,9 @@ export type InternalDoc = {
   toDept: string;
   status: string;
   createdAt: string;
+  attachments?: string[];
+  signProvider?: string;
+  signStatus?: string;
 };
 
 export type Dossier = {
@@ -45,7 +52,7 @@ export type Attachment = {
   version: string;
 };
 
-// Luồng xử lý
+// LuÃ¡Â»â€œng xÃ¡Â»Â­ lÃƒÂ½
 export type WorkflowSubmit = {
   id: string;
   documentCode: string;
@@ -73,6 +80,7 @@ export type WorkflowAssign = {
   assignee: string;
   deadline: string;
   status: string;
+  attachments?: string[];
 };
 
 export type WorkflowTracking = {
@@ -85,7 +93,7 @@ export type WorkflowTracking = {
   overdue: string;
 };
 
-// Ký số
+// KÃƒÂ½ sÃ¡Â»â€˜
 export type PersonalSign = {
   id: string;
   documentCode: string;
@@ -124,7 +132,7 @@ export type SignVerification = {
   verifiedAt: string;
 };
 
-// Liên thông
+// LiÃƒÂªn thÃƒÂ´ng
 export type SendInterop = {
   id: string;
   documentCode: string;
@@ -140,6 +148,7 @@ export type ReceiveInterop = {
   sender: string;
   receivedAt: string;
   status: string;
+  attachments?: string[];
 };
 
 export type Acknowledgement = {
@@ -166,9 +175,10 @@ export type RetryQueue = {
   errorType: string;
   retries: number;
   status: string;
+  attachments?: string[];
 };
 
-// Lưu trữ
+// LÃ†Â°u trÃ¡Â»Â¯
 export type FileStorage = {
   id: string;
   fileName: string;
@@ -197,7 +207,7 @@ export type DocumentPreview = {
   lastViewedAt: string;
 };
 
-// Thông báo
+// ThÃƒÂ´ng bÃƒÂ¡o
 export type Notification = {
   id: string;
   title: string;
@@ -205,25 +215,28 @@ export type Notification = {
   recipient: string;
   read: string;
   createdAt: string;
+  attachments?: string[];
+  signProvider?: string;
+  signStatus?: string;
 };
 
 export const outgoingDocs: OutgoingDoc[] = [
   {
     code: 'VB-DI-001',
-    title: 'Công văn gửi Bộ TTTT về chuyển đổi số',
-    type: 'Công văn',
-    receiver: 'Bộ TTTT',
-    urgency: 'Thường',
-    status: 'Đã phát hành',
+    title: 'CÃƒÂ´ng vÃ„Æ’n gÃ¡Â»Â­i BÃ¡Â»â„¢ TTTT vÃ¡Â»Â chuyÃ¡Â»Æ’n Ã„â€˜Ã¡Â»â€¢i sÃ¡Â»â€˜',
+    type: 'CÃƒÂ´ng vÃ„Æ’n',
+    receiver: 'BÃ¡Â»â„¢ TTTT',
+    urgency: 'ThÃ†Â°Ã¡Â»Âng',
+    status: 'Ã„ÂÃƒÂ£ phÃƒÂ¡t hÃƒÂ nh',
     createdAt: '25/06/2026 08:00',
   },
   {
     code: 'VB-DI-002',
-    title: 'Quyết định phê duyệt quy trình liên thông',
-    type: 'Quyết định',
-    receiver: 'Sở TTTT',
-    urgency: 'Khẩn',
-    status: 'Chờ ký',
+    title: 'QuyÃ¡ÂºÂ¿t Ã„â€˜Ã¡Â»â€¹nh phÃƒÂª duyÃ¡Â»â€¡t quy trÃƒÂ¬nh liÃƒÂªn thÃƒÂ´ng',
+    type: 'QuyÃ¡ÂºÂ¿t Ã„â€˜Ã¡Â»â€¹nh',
+    receiver: 'SÃ¡Â»Å¸ TTTT',
+    urgency: 'KhÃ¡ÂºÂ©n',
+    status: 'ChÃ¡Â»Â kÃƒÂ½',
     createdAt: '26/06/2026 10:30',
   },
 ];
@@ -231,29 +244,29 @@ export const outgoingDocs: OutgoingDoc[] = [
 export const incomingDocs: IncomingDoc[] = [
   {
     code: 'VB-DEN-001',
-    title: 'Công văn yêu cầu báo cáo quý II',
-    sender: 'Bộ TTTT',
-    assignedTo: 'Phòng CNTT',
+    title: 'CÃƒÂ´ng vÃ„Æ’n yÃƒÂªu cÃ¡ÂºÂ§u bÃƒÂ¡o cÃƒÂ¡o quÃƒÂ½ II',
+    sender: 'BÃ¡Â»â„¢ TTTT',
+    assignedTo: 'PhÃƒÂ²ng CNTT',
     deadline: '15/07/2026',
-    status: 'Đang xử lý',
+    status: 'Ã„Âang xÃ¡Â»Â­ lÃƒÂ½',
   },
   {
     code: 'VB-DEN-002',
-    title: 'Thông báo họp điều phối liên thông',
-    sender: 'UBND Hà Nội',
-    assignedTo: 'Văn phòng',
+    title: 'ThÃƒÂ´ng bÃƒÂ¡o hÃ¡Â»Âp Ã„â€˜iÃ¡Â»Âu phÃ¡Â»â€˜i liÃƒÂªn thÃƒÂ´ng',
+    sender: 'UBND HÃƒÂ  NÃ¡Â»â„¢i',
+    assignedTo: 'VÃ„Æ’n phÃƒÂ²ng',
     deadline: '10/07/2026',
-    status: 'Chờ phân luồng',
+    status: 'ChÃ¡Â»Â phÃƒÂ¢n luÃ¡Â»â€œng',
   },
 ];
 
 export const internalDocs: InternalDoc[] = [
   {
     code: 'VB-NB-001',
-    title: 'Phiếu trình ký nội bộ',
-    fromDept: 'Phòng CNTT',
-    toDept: 'Văn phòng',
-    status: 'Đang duyệt',
+    title: 'PhiÃ¡ÂºÂ¿u trÃƒÂ¬nh kÃƒÂ½ nÃ¡Â»â„¢i bÃ¡Â»â„¢',
+    fromDept: 'PhÃƒÂ²ng CNTT',
+    toDept: 'VÃ„Æ’n phÃƒÂ²ng',
+    status: 'Ã„Âang duyÃ¡Â»â€¡t',
     createdAt: '01/07/2026 09:00',
   },
 ];
@@ -261,10 +274,10 @@ export const internalDocs: InternalDoc[] = [
 export const dossiers: Dossier[] = [
   {
     code: 'HS-001',
-    name: 'Hồ sơ triển khai liên thông Q2/2026',
+    name: 'HÃ¡Â»â€œ sÃ†Â¡ triÃ¡Â»Æ’n khai liÃƒÂªn thÃƒÂ´ng Q2/2026',
     docCount: 12,
-    owner: 'Phòng CNTT',
-    status: 'Đang mở',
+    owner: 'PhÃƒÂ²ng CNTT',
+    status: 'Ã„Âang mÃ¡Â»Å¸',
     updatedAt: '02/07/2026 14:00',
   },
 ];
@@ -292,10 +305,10 @@ export const workflowSubmits: WorkflowSubmit[] = [
   {
     id: 'WF-001',
     documentCode: 'VB-DI-002',
-    title: 'Quyết định phê duyệt quy trình',
-    submitter: 'Nguyễn Văn A',
-    approver: 'Lê Văn C',
-    status: 'Chờ duyệt',
+    title: 'QuyÃ¡ÂºÂ¿t Ã„â€˜Ã¡Â»â€¹nh phÃƒÂª duyÃ¡Â»â€¡t quy trÃƒÂ¬nh',
+    submitter: 'NguyÃ¡Â»â€¦n VÃ„Æ’n A',
+    approver: 'LÃƒÂª VÃ„Æ’n C',
+    status: 'ChÃ¡Â»Â duyÃ¡Â»â€¡t',
     submittedAt: '26/06/2026 11:00',
   },
 ];
@@ -304,10 +317,10 @@ export const workflowApproves: WorkflowApprove[] = [
   {
     id: 'AP-001',
     documentCode: 'VB-DI-001',
-    title: 'Công văn gửi Bộ TTTT',
-    approver: 'Lê Văn C',
-    decision: 'Duyệt',
-    comment: 'Đồng ý phát hành',
+    title: 'CÃƒÂ´ng vÃ„Æ’n gÃ¡Â»Â­i BÃ¡Â»â„¢ TTTT',
+    approver: 'LÃƒÂª VÃ„Æ’n C',
+    decision: 'DuyÃ¡Â»â€¡t',
+    comment: 'Ã„ÂÃ¡Â»â€œng ÃƒÂ½ phÃƒÂ¡t hÃƒÂ nh',
     updatedAt: '25/06/2026 09:30',
   },
 ];
@@ -316,10 +329,10 @@ export const workflowAssigns: WorkflowAssign[] = [
   {
     id: 'AS-001',
     documentCode: 'VB-DEN-001',
-    assigner: 'Lê Văn C',
-    assignee: 'Trần Thị B',
+    assigner: 'LÃƒÂª VÃ„Æ’n C',
+    assignee: 'TrÃ¡ÂºÂ§n ThÃ¡Â»â€¹ B',
     deadline: '15/07/2026',
-    status: 'Đang xử lý',
+    status: 'Ã„Âang xÃ¡Â»Â­ lÃƒÂ½',
   },
 ];
 
@@ -327,11 +340,11 @@ export const workflowTrackings: WorkflowTracking[] = [
   {
     id: 'TK-001',
     documentCode: 'VB-DEN-001',
-    currentStep: 'Xử lý chuyên môn',
-    handler: 'Trần Thị B',
+    currentStep: 'XÃ¡Â»Â­ lÃƒÂ½ chuyÃƒÂªn mÃƒÂ´n',
+    handler: 'TrÃ¡ÂºÂ§n ThÃ¡Â»â€¹ B',
     progress: 60,
     dueDate: '15/07/2026',
-    overdue: 'Không',
+    overdue: 'KhÃƒÂ´ng',
   },
 ];
 
@@ -339,9 +352,9 @@ export const personalSigns: PersonalSign[] = [
   {
     id: 'KS-001',
     documentCode: 'VB-DI-001',
-    signer: 'Lê Văn C',
-    signType: 'Ký chính',
-    status: 'Thành công',
+    signer: 'LÃƒÂª VÃ„Æ’n C',
+    signType: 'KÃƒÂ½ chÃƒÂ­nh',
+    status: 'ThÃƒÂ nh cÃƒÂ´ng',
     signedAt: '25/06/2026 08:45',
   },
 ];
@@ -350,9 +363,9 @@ export const orgSigns: OrgSign[] = [
   {
     id: 'KT-001',
     documentCode: 'VB-DI-001',
-    orgName: 'UBND Hà Nội',
-    stampType: 'Đóng dấu điện tử',
-    status: 'Thành công',
+    orgName: 'UBND HÃƒÂ  NÃ¡Â»â„¢i',
+    stampType: 'Ã„ÂÃƒÂ³ng dÃ¡ÂºÂ¥u Ã„â€˜iÃ¡Â»â€¡n tÃ¡Â»Â­',
+    status: 'ThÃƒÂ nh cÃƒÂ´ng',
     signedAt: '25/06/2026 09:00',
   },
 ];
@@ -361,17 +374,17 @@ export const signHistories: SignHistory[] = [
   {
     id: 'LH-001',
     documentCode: 'VB-DI-001',
-    signer: 'Lê Văn C',
-    signType: 'Ký cá nhân',
-    result: 'Thành công',
+    signer: 'LÃƒÂª VÃ„Æ’n C',
+    signType: 'KÃƒÂ½ cÃƒÂ¡ nhÃƒÂ¢n',
+    result: 'ThÃƒÂ nh cÃƒÂ´ng',
     signedAt: '25/06/2026 08:45',
   },
   {
     id: 'LH-002',
     documentCode: 'VB-DI-001',
-    signer: 'UBND Hà Nội',
-    signType: 'Ký tổ chức',
-    result: 'Thành công',
+    signer: 'UBND HÃƒÂ  NÃ¡Â»â„¢i',
+    signType: 'KÃƒÂ½ tÃ¡Â»â€¢ chÃ¡Â»Â©c',
+    result: 'ThÃƒÂ nh cÃƒÂ´ng',
     signedAt: '25/06/2026 09:00',
   },
 ];
@@ -381,20 +394,20 @@ export const signVerifications: SignVerification[] = [
     id: 'XT-001',
     documentCode: 'VB-DI-001',
     fileName: 'cong-van.pdf',
-    signer: 'Lê Văn C',
-    certificate: 'CN=Lê Văn C, O=UBND Hà Nội',
+    signer: 'LÃƒÂª VÃ„Æ’n C',
+    certificate: 'CN=LÃƒÂª VÃ„Æ’n C, O=UBND HÃƒÂ  NÃ¡Â»â„¢i',
     signTime: '25/06/2026 08:45',
-    verifyResult: 'Hợp lệ',
+    verifyResult: 'HÃ¡Â»Â£p lÃ¡Â»â€¡',
     verifiedAt: '25/06/2026 10:00',
   },
   {
     id: 'XT-002',
     documentCode: 'VB-DI-002',
     fileName: 'quyet-dinh.pdf',
-    signer: 'Trần Thị B',
-    certificate: 'CN=Trần Thị B, O=Sở TTTT',
+    signer: 'TrÃ¡ÂºÂ§n ThÃ¡Â»â€¹ B',
+    certificate: 'CN=TrÃ¡ÂºÂ§n ThÃ¡Â»â€¹ B, O=SÃ¡Â»Å¸ TTTT',
     signTime: '26/06/2026 14:20',
-    verifyResult: 'Không hợp lệ',
+    verifyResult: 'KhÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡',
     verifiedAt: '26/06/2026 15:00',
   },
 ];
@@ -403,9 +416,9 @@ export const sendInterops: SendInterop[] = [
   {
     id: 'LT-G-001',
     documentCode: 'VB-DI-001',
-    receiver: 'Bộ TTTT',
+    receiver: 'BÃ¡Â»â„¢ TTTT',
     route: 'UBND_HN -> TRUC_LT -> BO_TTTT',
-    status: 'Đã gửi',
+    status: 'Ã„ÂÃƒÂ£ gÃ¡Â»Â­i',
     sentAt: '25/06/2026 09:15',
   },
 ];
@@ -414,9 +427,9 @@ export const receiveInterops: ReceiveInterop[] = [
   {
     id: 'LT-N-001',
     documentCode: 'VB-DEN-001',
-    sender: 'Bộ TTTT',
+    sender: 'BÃ¡Â»â„¢ TTTT',
     receivedAt: '24/06/2026 16:30',
-    status: 'Đã nhận',
+    status: 'Ã„ÂÃƒÂ£ nhÃ¡ÂºÂ­n',
   },
 ];
 
@@ -436,7 +449,7 @@ export const syncStatuses: SyncStatus[] = [
     id: 'DB-001',
     transactionId: 'TX-240625-1001',
     documentCode: 'VB-DI-001',
-    syncStatus: 'Đã đồng bộ',
+    syncStatus: 'Ã„ÂÃƒÂ£ Ã„â€˜Ã¡Â»â€œng bÃ¡Â»â„¢',
     lastSyncAt: '25/06/2026 09:20',
   },
 ];
@@ -448,7 +461,7 @@ export const retryQueues: RetryQueue[] = [
     documentCode: 'VB-2026-000147',
     errorType: 'API Timeout',
     retries: 1,
-    status: 'Đang retry',
+    status: 'Ã„Âang retry',
   },
 ];
 
@@ -469,7 +482,7 @@ export const fileVersions: FileVersion[] = [
     fileName: 'cong-van.pdf',
     documentCode: 'VB-DI-001',
     version: 'v3',
-    status: 'Đã ký',
+    status: 'Ã„ÂÃƒÂ£ kÃƒÂ½',
     updatedAt: '25/06/2026 09:00',
   },
   {
@@ -477,7 +490,7 @@ export const fileVersions: FileVersion[] = [
     fileName: 'cong-van.pdf',
     documentCode: 'VB-DI-001',
     version: 'v2',
-    status: 'Đã duyệt',
+    status: 'Ã„ÂÃƒÂ£ duyÃ¡Â»â€¡t',
     updatedAt: '25/06/2026 08:30',
   },
 ];
@@ -488,7 +501,7 @@ export const documentPreviews: DocumentPreview[] = [
     fileName: 'cong-van.pdf',
     documentCode: 'VB-DI-001',
     fileType: 'PDF',
-    previewStatus: 'Sẵn sàng',
+    previewStatus: 'SÃ¡ÂºÂµn sÃƒÂ ng',
     pageCount: 5,
     lastViewedAt: '02/07/2026 09:30',
   },
@@ -497,7 +510,7 @@ export const documentPreviews: DocumentPreview[] = [
     fileName: 'phu-luc.docx',
     documentCode: 'VB-DI-001',
     fileType: 'DOCX',
-    previewStatus: 'Sẵn sàng',
+    previewStatus: 'SÃ¡ÂºÂµn sÃƒÂ ng',
     pageCount: 3,
     lastViewedAt: '01/07/2026 16:45',
   },
@@ -506,7 +519,7 @@ export const documentPreviews: DocumentPreview[] = [
     fileName: 'bao-cao.pdf',
     documentCode: 'VB-DEN-001',
     fileType: 'PDF',
-    previewStatus: 'Đang xử lý',
+    previewStatus: 'Ã„Âang xÃ¡Â»Â­ lÃƒÂ½',
     pageCount: 12,
     lastViewedAt: '-',
   },
@@ -515,18 +528,18 @@ export const documentPreviews: DocumentPreview[] = [
 export const notifications: Notification[] = [
   {
     id: 'NT-001',
-    title: 'Có văn bản mới cần duyệt',
-    type: 'Cần duyệt',
-    recipient: 'Lê Văn C',
-    read: 'Chưa đọc',
+    title: 'CÃƒÂ³ vÃ„Æ’n bÃ¡ÂºÂ£n mÃ¡Â»â€ºi cÃ¡ÂºÂ§n duyÃ¡Â»â€¡t',
+    type: 'CÃ¡ÂºÂ§n duyÃ¡Â»â€¡t',
+    recipient: 'LÃƒÂª VÃ„Æ’n C',
+    read: 'ChÃ†Â°a Ã„â€˜Ã¡Â»Âc',
     createdAt: '02/07/2026 08:00',
   },
   {
     id: 'NT-002',
-    title: 'Văn bản quá hạn xử lý',
-    type: 'Cảnh báo',
-    recipient: 'Trần Thị B',
-    read: 'Đã đọc',
+    title: 'VÃ„Æ’n bÃ¡ÂºÂ£n quÃƒÂ¡ hÃ¡ÂºÂ¡n xÃ¡Â»Â­ lÃƒÂ½',
+    type: 'CÃ¡ÂºÂ£nh bÃƒÂ¡o',
+    recipient: 'TrÃ¡ÂºÂ§n ThÃ¡Â»â€¹ B',
+    read: 'Ã„ÂÃƒÂ£ Ã„â€˜Ã¡Â»Âc',
     createdAt: '01/07/2026 17:30',
   },
 ];

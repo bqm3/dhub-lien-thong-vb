@@ -52,15 +52,15 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
       <Stack
         spacing={3}
         sx={{
-          pt: 3,
-          pb: 2,
+          pt: 2,
+          pb: 1,
           px: 2.5,
           flexShrink: 0,
         }}
       >
         <Logo />
 
-        <NavAccount />
+        {/* <NavAccount /> */}
       </Stack>
 
       <NavSectionVertical data={filteredNavConfig} />

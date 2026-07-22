@@ -41,7 +41,13 @@ export default function LoadingScreen() {
             repeat: Infinity,
           }}
         >
-          <Logo disabledLink sx={{ width: 64, height: 64 }} />
+          {/* <Logo disabledLink sx={{ width: 64, height: 64 }} />
+           */}
+          <Box
+            component="img"
+            src="/logo/signet.png"
+            sx={{ cursor: 'pointer', width: 64, height: 64 }}
+          />
         </m.div>
 
         <Box

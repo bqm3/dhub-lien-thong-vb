@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Box,
@@ -7,12 +7,16 @@ import {
   Container,
   Divider,
   LinearProgress,
+  Pagination,
   Stack,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
+  TextField,
+  MenuItem,
   Typography,
 } from '@mui/material';
 import Iconify from '../../components/iconify';
@@ -62,22 +66,22 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
         <Stack spacing={3}>
           <Box
             sx={{
-              p: 3,
-              borderRadius: 3,
+              p: 2,
+              borderRadius: 2,
               color: 'common.white',
-              textAlign: 'center',
+              textAlign: 'left',
               background:
                 'linear-gradient(135deg, rgba(12,52,87,1) 0%, rgba(24,97,140,1) 55%, rgba(59,154,191,1) 100%)',
               boxShadow: (theme) => theme.shadows[12],
             }}
           >
-            <Typography variant="overline" sx={{ opacity: 0.8 }}>
+            {/* <Typography variant="overline" sx={{ opacity: 0.8 }}>
               TRỤC LIÊN THÔNG VĂN BẢN
-            </Typography>
+            </Typography> */}
             <Typography variant="h3" sx={{ mt: 1, mb: 1 }}>
               {title}
             </Typography>
-            <Typography variant="body1" sx={{ maxWidth: 860, mx: 'auto', opacity: 0.88 }}>
+            <Typography variant="body1" sx={{ mx: 'auto', opacity: 0.88 }}>
               {subtitle}
             </Typography>
           </Box>
@@ -149,10 +153,10 @@ export function StatusChip({ status }: { status: string }) {
 
   let color: 'success' | 'warning' | 'error' | 'info' | 'default' = 'default';
 
-  if (['active', 'received', 'ack', 'đã nhận'].includes(normalized)) color = 'success';
-  if (['pending', 'retrying', 'waiting', 'đang xử lý'].includes(normalized)) color = 'warning';
-  if (['failed', 'nack'].includes(normalized)) color = 'error';
-  if (['sent', 'đã phát hành', 'đang lưu trữ'].includes(normalized)) color = 'info';
+  if (['active', 'received', 'ack', 'đã nhận', 'hoàn thành', 'đã khắc phục', 'đạt', 'ổn định'].includes(normalized)) color = 'success';
+  if (['pending', 'retrying', 'waiting', 'đang xử lý', 'đang tạo', 'chờ đơn vị'].includes(normalized)) color = 'warning';
+  if (['failed', 'nack', 'thất bại'].includes(normalized)) color = 'error';
+  if (['sent', 'đã phát hành', 'đang lưu trữ', 'đã gửi lại'].includes(normalized)) color = 'info';
 
   return <Chip label={status} color={color} size="small" variant={color === 'default' ? 'outlined' : 'filled'} />;
 }
@@ -193,29 +197,83 @@ export function ProgressList({ items }: { items: { label: string; value: number 
 }
 
 export function DataTable<T extends Record<string, ReactNode>>({ columns, rows }: DataTableProps<T>) {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const paginatedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+
   return (
-    <Table size="small">
-      <TableHead>
-        <TableRow>
-          {columns.map((column) => (
-            <TableCell key={String(column.key)} align={column.align || 'left'}>
-              {column.label}
-            </TableCell>
-          ))}
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {rows.map((row, index) => (
-          <TableRow key={index}>
-            {columns.map((column) => (
-              <TableCell key={String(column.key)} align={column.align || 'left'}>
-                {row[column.key]}
-              </TableCell>
+    <Stack spacing={1.5}>
+      <TableContainer sx={{ overflowX: 'auto' }}>
+        <Table size="small" sx={{ minWidth: 960 }}>
+          <TableHead>
+            <TableRow>
+              {columns.map((column) => (
+                <TableCell key={String(column.key)} align={column.align || 'left'}>
+                  {column.label}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {paginatedRows.map((row, index) => (
+              <TableRow key={index}>
+                {columns.map((column) => (
+                  <TableCell key={String(column.key)} align={column.align || 'left'}>
+                    {row[column.key]}
+                  </TableCell>
+                ))}
+              </TableRow>
             ))}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+        justifyContent="space-between"
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Typography variant="body2" color="text.secondary">
+            Số dòng mỗi trang
+          </Typography>
+          <TextField
+            select
+            size="small"
+            value={rowsPerPage}
+            onChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            sx={{ minWidth: 96 }}
+          >
+            {[5, 10, 25, 50].map((option) => (
+              <MenuItem key={option} value={option}>
+                {option}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Typography variant="body2" color="text.secondary">
+            {rows.length === 0
+              ? '0-0 / 0'
+              : `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, rows.length)} / ${rows.length}`}
+          </Typography>
+        </Stack>
+
+        <Pagination
+          color="primary"
+          shape="rounded"
+          page={page + 1}
+          count={totalPages}
+          onChange={(_, value) => setPage(value - 1)}
+          showFirstButton
+          showLastButton
+        />
+      </Stack>
+    </Stack>
   );
 }
 

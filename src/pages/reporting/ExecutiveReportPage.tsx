@@ -1,5 +1,5 @@
 import ReportSectionPage from './ReportSectionPage';
 
-export default function ReportingPage() {
+export default function ExecutiveReportPage() {
   return <ReportSectionPage section="executive" />;
 }

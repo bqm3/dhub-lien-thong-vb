@@ -26,13 +26,21 @@ export type DocumentRecord = {
 export type ExchangeTransaction = {
   id: string;
   documentCode: string;
+  documentTitle?: string;
+  documentType?: string;
   route: string;
   sender: string;
+  senderPerson?: string;
+  senderTitle?: string;
   receiver: string;
   status: 'sent' | 'received' | 'failed' | 'retrying';
   ack: 'ACK' | 'NACK' | 'WAITING';
   retries: number;
+  sentAt?: string;
+  receivedAt?: string;
   updatedAt: string;
+  errorReason?: string;
+  errorDetail?: string;
 };
 
 // Prefer richer JSON for demo UI
@@ -40,9 +48,20 @@ export type ExchangeTransaction = {
 import fakeData from './fakeData.json';
 
 export const overviewMetrics = [
-  { label: 'Tổng số văn bản', value: String(fakeData.documents.length), helper: 'Dataset demo (JSON)' },
-  { label: 'Tổng giao dịch', value: String(fakeData.exchangeTransactions.length), helper: 'Dataset demo (JSON)' },
-  { label: 'Đơn vị tham gia', value: String(fakeData.agencies.length), helper: 'Dataset demo (JSON)' },
+  { label: 'Tổng số văn bản', value: String(fakeData.documents.length), helper: `${fakeData.documents.length} văn bản trong hệ thống` },
+  { label: 'Tổng giao dịch', value: String(fakeData.exchangeTransactions.length), helper: `${fakeData.exchangeTransactions.length} giao dịch liên thông` },
+  { label: 'Tổng file đính kèm', value: String(fakeData.documents.length * 2), helper: 'Ước tính ~2 file/văn bản' },
+  { label: 'Đơn vị tham gia', value: String(fakeData.agencies.length), helper: `${fakeData.agencies.filter((a) => a.status === 'active').length} active / ${fakeData.agencies.filter((a) => a.status === 'pending').length} pending` },
+  {
+    label: 'Tỷ lệ thành công',
+    value: `${(fakeData.exchangeTransactions.filter((t) => t.status === 'received' || t.status === 'sent').length / fakeData.exchangeTransactions.length * 100).toFixed(1)}%`,
+    helper: `${fakeData.exchangeTransactions.filter((t) => t.status === 'received' || t.status === 'sent').length}/${fakeData.exchangeTransactions.length} giao dịch thành công`,
+  },
+  {
+    label: 'Tỷ lệ lỗi',
+    value: `${(fakeData.exchangeTransactions.filter((t) => t.status === 'failed').length / fakeData.exchangeTransactions.length * 100).toFixed(1)}%`,
+    helper: `${fakeData.exchangeTransactions.filter((t) => t.status === 'failed').length} giao dịch thất bại`,
+  },
 ];
 
 export const integrationFunctions = [
@@ -115,33 +134,57 @@ export const reportCatalog = [
 ];
 
 export const reportHighlights = [
-  { label: 'QUYẾT ĐỊNH', value: 30 },
-  { label: 'CÔNG VĂN', value: 50 },
+  { label: 'QUYẾT ĐỊNH', value: 22 },
+  { label: 'CÔNG VĂN', value: 45 },
   { label: 'BÁO CÁO', value: 20 },
+  { label: 'THÔNG BÁO', value: 8 },
+  { label: 'KẾ HOẠCH', value: 5 },
 ];
 
 export const deliveryStatusSummary = [
-  { label: 'SENT', value: 10000 },
-  { label: 'RECEIVED', value: 9800 },
-  { label: 'FAILED', value: 200 },
+  { label: 'SENT', value: 12400 },
+  { label: 'RECEIVED', value: 11850 },
+  { label: 'RETRYING', value: 320 },
+  { label: 'FAILED', value: 430 },
 ];
 
 export const errorSummary = [
-  { label: 'API Timeout', value: 200 },
-  { label: 'Signature Error', value: 150 },
-  { label: 'Routing Error', value: 100 },
-  { label: 'Storage Error', value: 50 },
+  { label: 'API Timeout', value: 215 },
+  { label: 'Signature Error', value: 172 },
+  { label: 'Routing Error', value: 118 },
+  { label: 'Storage Error', value: 64 },
+  { label: 'Auth Failed', value: 31 },
 ];
 
 export const retrySummary = [
-  { label: 'Lần 1', value: 500 },
-  { label: 'Lần 2', value: 200 },
+  { label: 'Lần 1', value: 520 },
+  { label: 'Lần 2', value: 210 },
+  { label: 'Lần 3', value: 85 },
+  { label: 'Lần 4+', value: 25 },
 ];
 
 export const topAgencies = {
-  senders: ['UBND Hà Nội', 'Bộ TTTT', 'Sở Nội Vụ'],
-  receivers: ['Sở Nội Vụ: 50,000', 'Sở TTTT: 45,000', 'UBND Hà Nội: 39,500'],
-  sla: 'SO_NOI_VU | Receive success: 99.8% | Avg: 3s',
+  senders: [
+    'UBND Hà Nội: 8,240 văn bản',
+    'Bộ Thông tin và Truyền thông: 6,500 văn bản',
+    'Sở Nội Vụ: 5,180 văn bản',
+    'Bộ Công an: 4,970 văn bản',
+    'UBND TP.HCM: 4,600 văn bản',
+  ],
+  receivers: [
+    'Sở Nội Vụ: 50,000 văn bản',
+    'Sở TTTT: 45,200 văn bản',
+    'UBND Hà Nội: 39,800 văn bản',
+    'Bộ Tài chính: 32,400 văn bản',
+    'Kho bạc Nhà nước: 28,750 văn bản',
+  ],
+  sla: [
+    'SO_NOI_VU | Nhận thành công: 99.8% | Avg: 3.1s',
+    'KBNN | Nhận thành công: 99.7% | Avg: 2.9s',
+    'UBND_HANOI | Nhận thành công: 99.5% | Avg: 2.8s',
+    'BO_CONG_AN | Nhận thành công: 99.9% | Avg: 2.5s',
+    'SO_Y_TE_HN | Nhận thành công: 99.4% | Avg: 3.1s',
+  ],
 };
 
 export const apiEndpoints = [

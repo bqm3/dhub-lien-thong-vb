@@ -2,15 +2,13 @@ export type PermissionCode = string;
 
 export type PermissionCheckMode = 'any' | 'all';
 
-// Master list of all permission codes in the system (Simplified to core modules)
 export const PERMISSIONS = {
-  ADMIN_MANAGE: 'ADMIN_MANAGE',       // Quản trị hệ thống
-  DOC_MANAGE: 'DOC_MANAGE',           // Quản lý văn bản & lưu trữ
-  WF_MANAGE: 'WF_MANAGE',             // Phê duyệt xử lý & ký số
-  EXCHANGE_MANAGE: 'EXCHANGE_MANAGE', // Liên thông & báo cáo thống kê
+  ADMIN_MANAGE: 'ADMIN_MANAGE',
+  DOC_MANAGE: 'DOC_MANAGE',
+  WF_MANAGE: 'WF_MANAGE',
+  EXCHANGE_MANAGE: 'EXCHANGE_MANAGE',
 };
 
-// Role permissions mapping
 export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
   ADMIN: [
     PERMISSIONS.ADMIN_MANAGE,
@@ -32,9 +30,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
   ],
 };
 
-// Central path to permissions mapping (Single Source of Truth)
 export const PATH_PERMISSIONS: Record<string, PermissionCode[]> = {
-  // Parent group modules
   '/dashboard/admin': [PERMISSIONS.ADMIN_MANAGE],
   '/dashboard/documents': [PERMISSIONS.DOC_MANAGE],
   '/dashboard/workflow': [PERMISSIONS.WF_MANAGE],
@@ -43,7 +39,6 @@ export const PATH_PERMISSIONS: Record<string, PermissionCode[]> = {
   '/dashboard/storage': [PERMISSIONS.DOC_MANAGE],
   '/dashboard/operations': [PERMISSIONS.EXCHANGE_MANAGE],
 
-  // Specific page paths
   '/dashboard/admin/users': [PERMISSIONS.ADMIN_MANAGE],
   '/dashboard/admin/units': [PERMISSIONS.ADMIN_MANAGE],
   '/dashboard/admin/roles': [PERMISSIONS.ADMIN_MANAGE],
@@ -79,6 +74,16 @@ export const PATH_PERMISSIONS: Record<string, PermissionCode[]> = {
 
   '/dashboard/operations/document-exchange': [PERMISSIONS.EXCHANGE_MANAGE],
   '/dashboard/operations/reporting': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/executive': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/document': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/incoming': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/type': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/delivery': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/error': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/retry': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/agency': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/daily': [PERMISSIONS.EXCHANGE_MANAGE],
+  '/dashboard/operations/reporting/export': [PERMISSIONS.EXCHANGE_MANAGE],
   '/dashboard/operations/sample-api': [PERMISSIONS.ADMIN_MANAGE],
 };
 
@@ -99,4 +104,3 @@ export function hasPermissions(args: {
   if (mode === 'all') return requiredList.every((p) => userSet.has(p));
   return requiredList.some((p) => userSet.has(p));
 }
-
