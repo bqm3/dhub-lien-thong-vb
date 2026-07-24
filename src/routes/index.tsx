@@ -170,6 +170,23 @@ export default function Router() {
             { path: 'sample-api', element: <GuardedPage path='/dashboard/operations/sample-api' element={<SampleApiPage />} /> },
           ],
         },
+        {
+          path: 'reports',
+          children: [
+                { element: <Navigate to='/dashboard/operations/reporting/executive' replace />, index: true },
+                { path: 'executive', element: <GuardedPage path='/dashboard/operations/reporting/executive' element={<ExecutiveReportPage />} /> },
+                { path: 'document', element: <GuardedPage path='/dashboard/operations/reporting/document' element={<DocumentReportPage />} /> },
+                { path: 'incoming', element: <GuardedPage path='/dashboard/operations/reporting/incoming' element={<IncomingReportPage />} /> },
+                { path: 'type', element: <GuardedPage path='/dashboard/operations/reporting/type' element={<DocumentTypeReportPage />} /> },
+                { path: 'delivery', element: <GuardedPage path='/dashboard/operations/reporting/delivery' element={<DeliveryReportPage />} /> },
+                { path: 'error', element: <GuardedPage path='/dashboard/operations/reporting/error' element={<ErrorReportPage />} /> },
+                { path: 'retry', element: <GuardedPage path='/dashboard/operations/reporting/retry' element={<RetryReportPage />} /> },
+                { path: 'agency', element: <GuardedPage path='/dashboard/operations/reporting/agency' element={<AgencyReportPage />} /> },
+                { path: 'daily', element: <GuardedPage path='/dashboard/operations/reporting/daily' element={<DailyOperationReportPage />} /> },
+                { path: 'export', element: <GuardedPage path='/dashboard/operations/reporting/export' element={<ExportReportPage />} /> },
+            
+            ],
+        },
       ],
     },
     { element: <CompactLayout />, children: [{ path: '404', element: <Page404 /> }] },

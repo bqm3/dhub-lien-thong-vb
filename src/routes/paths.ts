@@ -81,4 +81,18 @@ export const PATH_DASHBOARD = {
     },
     api: path(ROOTS_DASHBOARD, '/operations/sample-api'),
   },
+  
+    reporting: {
+      root: path(ROOTS_DASHBOARD, '/operations/reporting'),
+      executive: path(ROOTS_DASHBOARD, '/operations/reporting/executive'),
+      document: path(ROOTS_DASHBOARD, '/operations/reporting/document'),
+      incoming: path(ROOTS_DASHBOARD, '/operations/reporting/incoming'),
+      type: path(ROOTS_DASHBOARD, '/operations/reporting/type'),
+      delivery: path(ROOTS_DASHBOARD, '/operations/reporting/delivery'),
+      error: path(ROOTS_DASHBOARD, '/operations/reporting/error'),
+      retry: path(ROOTS_DASHBOARD, '/operations/reporting/retry'),
+      agency: path(ROOTS_DASHBOARD, '/operations/reporting/agency'),
+      daily: path(ROOTS_DASHBOARD, '/operations/reporting/daily'),
+      export: path(ROOTS_DASHBOARD, '/operations/reporting/export'),
+    },
 };
