@@ -11,7 +11,7 @@ import {
   Stack,
   TextField,
 } from '@mui/material';
-import { DataTable, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
+import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
 
 type CategoryRecord = {
   id: string;
@@ -150,44 +150,34 @@ export default function CategoriesPage() {
       title="Danh mục dùng chung"
       subtitle="Quản lý danh mục: loại văn bản, độ khẩn/mật, lĩnh vực, trạng thái, hình thức gửi/nhận. CRUD tách riêng và thao tác bằng modal."
     >
-      <Grid container>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Tổng mục"
-            value={rows.length}
-            helper="Dữ liệu demo (local state)"
-            icon="solar:widget-2-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Nhóm danh mục"
-            value={new Set(rows.map((r) => r.group)).size}
-            helper="Group theo nghiệp vụ"
-            icon="solar:category-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Đang active"
-            value={rows.filter((r) => r.status === 'Active').length}
-            helper="Dùng cho dropdown/filter"
-            icon="solar:checklist-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Ngưng dùng"
-            value={rows.filter((r) => r.status === 'Inactive').length}
-            helper="Ẩn khỏi lựa chọn"
-            icon="solar:eye-closed-bold"
-          />
-        </Grid>
-      </Grid>
+      <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
+        <MetricCard
+          label="Tổng mục"
+          value={rows.length}
+          helper="Dữ liệu demo (local state)"
+          icon="solar:widget-2-bold"
+        />
+        <MetricCard
+          label="Nhóm danh mục"
+          value={new Set(rows.map((r) => r.group)).size}
+          helper="Group theo nghiệp vụ"
+          icon="solar:category-bold"
+        />
+        <MetricCard
+          label="Đang active"
+          value={rows.filter((r) => r.status === 'Active').length}
+          helper="Dùng cho dropdown/filter"
+          icon="solar:checklist-bold"
+        />
+        <MetricCard
+          label="Ngưng dùng"
+          value={rows.filter((r) => r.status === 'Inactive').length}
+          helper="Ẩn khỏi lựa chọn"
+          icon="solar:eye-closed-bold"
+        />
+      </GridRow>
 
-      <Grid container>
-        <Grid item xs={12}>
-          <SectionCard
+      <SectionCard
             title="Danh sách danh mục"
             subtitle="Màn hình danh mục tách riêng; thêm/sửa/xóa bằng modal."
             action={
@@ -220,8 +210,6 @@ export default function CategoriesPage() {
               </Box>
             </Stack>
           </SectionCard>
-        </Grid>
-      </Grid>
 
       <Dialog open={openEditor} onClose={() => setOpenEditor(false)} fullWidth maxWidth="md">
         <DialogTitle>{editingId ? 'Cập nhật danh mục' : 'Tạo mới danh mục'}</DialogTitle>

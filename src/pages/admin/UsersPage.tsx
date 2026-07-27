@@ -11,7 +11,7 @@ import {
   Stack,
   TextField,
 } from '@mui/material';
-import { DataTable, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
+import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
 
 type UserRecord = {
   id: string;
@@ -148,44 +148,34 @@ export default function UsersPage() {
       title="Người dùng"
       subtitle="Danh sách tài khoản, thông tin cán bộ, đơn vị, vai trò. CRUD tách riêng theo màn hình; Create/Update/Delete đều thao tác bằng popup modal."
     >
-      <Grid container>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Tổng người dùng"
-            value={rows.length}
-            helper="Dữ liệu demo (local state)"
-            icon="solar:users-group-rounded-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Đang hoạt động"
-            value={rows.filter((u) => u.status === 'Active').length}
-            helper="Có thể khóa/mở trong modal"
-            icon="solar:shield-check-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Bị khóa"
-            value={rows.filter((u) => u.status === 'Locked').length}
-            helper="Khóa đăng nhập"
-            icon="solar:lock-password-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Vai trò"
-            value={new Set(rows.map((u) => u.role)).size}
-            helper="Phân quyền theo vai trò"
-            icon="solar:user-id-bold"
-          />
-        </Grid>
-      </Grid>
+      <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
+        <MetricCard
+          label="Tổng người dùng"
+          value={rows.length}
+          helper="Dữ liệu demo (local state)"
+          icon="solar:users-group-rounded-bold"
+        />
+        <MetricCard
+          label="Đang hoạt động"
+          value={rows.filter((u) => u.status === 'Active').length}
+          helper="Có thể khóa/mở trong modal"
+          icon="solar:shield-check-bold"
+        />
+        <MetricCard
+          label="Bị khóa"
+          value={rows.filter((u) => u.status === 'Locked').length}
+          helper="Khóa đăng nhập"
+          icon="solar:lock-password-bold"
+        />
+        <MetricCard
+          label="Vai trò"
+          value={new Set(rows.map((u) => u.role)).size}
+          helper="Phân quyền theo vai trò"
+          icon="solar:user-id-bold"
+        />
+      </GridRow>
 
-      <Grid container>
-        <Grid item xs={12}>
-          <SectionCard
+      <SectionCard
             title="Danh sách người dùng"
             subtitle="Tách riêng giao diện quản lý người dùng; có tìm kiếm, thêm/sửa/xóa bằng modal."
             action={
@@ -220,8 +210,6 @@ export default function UsersPage() {
               </Box>
             </Stack>
           </SectionCard>
-        </Grid>
-      </Grid>
 
       <Dialog open={openEditor} onClose={() => setOpenEditor(false)} fullWidth maxWidth="md">
         <DialogTitle>{editingId ? 'Cập nhật người dùng' : 'Tạo mới người dùng'}</DialogTitle>

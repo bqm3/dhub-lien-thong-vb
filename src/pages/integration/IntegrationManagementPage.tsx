@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
   MenuItem,
   Stack,
   TextField,
@@ -15,6 +14,7 @@ import {
   Tabs,
   Tab,
   Chip,
+  Grid
 } from '@mui/material';
 import {
   AgencyConnection,
@@ -22,6 +22,7 @@ import {
 } from '../../sections/interoperability/mockData';
 import {
   DataTable,
+  GridRow,
   MetricCard,
   PageShell,
   SectionCard,
@@ -204,44 +205,36 @@ export default function IntegrationManagementPage() {
       subtitle="Quản lý các đơn vị tham gia trục liên thông: đăng ký, cấp Client ID, API Key, cấu hình Endpoint và quản lý Credential."
     >
       {/* Metrics */}
-      <Grid container>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Đơn vị đã đăng ký"
-            value={agencyList.length}
-            helper={`${activeAgencies.length} active / ${pendingAgencies.length} pending / ${warningAgencies.length} warning`}
-            icon="solar:user-plus-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Client ID đang hoạt động"
-            value={activeAgencies.length}
-            helper="Cấp theo agencyCode, không trùng lặp"
-            icon="solar:key-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Endpoint đang giám sát"
-            value={agencyList.length}
-            helper="Kiểm tra health mỗi 5 phút"
-            icon="solar:global-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Credential cần gia hạn"
-            value={warningAgencies.length}
-            helper="Sẽ hết hạn trong 14 ngày tới"
-            icon="solar:shield-warning-bold"
-          />
-        </Grid>
-      </Grid>
+      <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
+        <MetricCard
+          label="Đơn vị đã đăng ký"
+          value={agencyList.length}
+          helper={`${activeAgencies.length} active / ${pendingAgencies.length} pending / ${warningAgencies.length} warning`}
+          icon="solar:user-plus-bold"
+        />
+        <MetricCard
+          label="Client ID đang hoạt động"
+          value={activeAgencies.length}
+          helper="Cấp theo agencyCode, không trùng lặp"
+          icon="solar:key-bold"
+        />
+        <MetricCard
+          label="Endpoint đang giám sát"
+          value={agencyList.length}
+          helper="Kiểm tra health mỗi 5 phút"
+          icon="solar:global-bold"
+        />
+        <MetricCard
+          label="Credential cần gia hạn"
+          value={warningAgencies.length}
+          helper="Sẽ hết hạn trong 14 ngày tới"
+          icon="solar:shield-warning-bold"
+        />
+      </GridRow>
 
       {/* Summary cards */}
-      <Grid container>
-        <Grid item xs={12} md={4}>
+      <GridRow cols={{ xs: 1, md: 3 }}>
+        <Box>
           <SectionCard title="Cơ cấu đơn vị" subtitle="Phân loại theo cấp hành chính.">
             <Stack spacing={1.5}>
               {[
@@ -258,8 +251,8 @@ export default function IntegrationManagementPage() {
               ))}
             </Stack>
           </SectionCard>
-        </Grid>
-        <Grid item xs={12} md={4}>
+        </Box>
+        <Box>
           <SectionCard title="Credential Policy" subtitle="Quy tắc vận hành bảo mật kết nối.">
             <Stack spacing={1.5}>
               {[
@@ -274,8 +267,8 @@ export default function IntegrationManagementPage() {
               ))}
             </Stack>
           </SectionCard>
-        </Grid>
-        <Grid item xs={12} md={4}>
+        </Box>
+        <Box>
           <SectionCard title="Trạng thái kết nối" subtitle="Tổng hợp theo trạng thái hiện tại.">
             <Stack spacing={1.5}>
               {[
@@ -292,8 +285,8 @@ export default function IntegrationManagementPage() {
               ))}
             </Stack>
           </SectionCard>
-        </Grid>
-      </Grid>
+        </Box>
+      </GridRow>
 
       {/* Main tabs */}
       <SectionCard

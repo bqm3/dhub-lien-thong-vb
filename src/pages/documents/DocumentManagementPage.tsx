@@ -29,6 +29,7 @@ import {
 } from '../../sections/interoperability/mockData';
 import {
   DataTable,
+  GridRow,
   MetricCard,
   PageShell,
   SectionCard,
@@ -477,72 +478,60 @@ export default function DocumentManagementPage() {
       title="Document Management"
       subtitle="Quản lý toàn bộ vòng đời văn bản điện tử: tạo mới, metadata, file đính kèm, ký số, gửi nhận, lưu trữ và tra cứu trên một màn hình."
     >
-      <Grid container>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Tổng văn bản"
-            value={documentList.length}
-            helper={`${documentList.filter((d) => d.status === 'Đã phát hành').length} đã phát hành`}
-            icon="solar:documents-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Có đính kèm"
-            value={documentList.filter((d) => d.attachments.length > 0).length}
-            helper="Có tối thiểu 1 tệp"
-            icon="solar:paperclip-2-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Đã ký số"
-            value={documentList.filter((d) => d.signStatus === 'Đã ký số').length}
-            helper="Hoàn tất bước ký"
-            icon="solar:shield-check-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Đang xử lý"
-            value={documentList.filter((d) => d.status === 'Đang xử lý').length}
-            helper="Chờ xử lý hoặc phát hành"
-            icon="solar:refresh-circle-bold"
-          />
-        </Grid>
-      </Grid>
+      <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
+        <MetricCard
+          label="Tổng văn bản"
+          value={documentList.length}
+          helper={`${documentList.filter((d) => d.status === 'Đã phát hành').length} đã phát hành`}
+          icon="solar:documents-bold"
+        />
+        <MetricCard
+          label="Có đính kèm"
+          value={documentList.filter((d) => d.attachments.length > 0).length}
+          helper="Có tối thiểu 1 tệp"
+          icon="solar:paperclip-2-bold"
+        />
+        <MetricCard
+          label="Đã ký số"
+          value={documentList.filter((d) => d.signStatus === 'Đã ký số').length}
+          helper="Hoàn tất bước ký"
+          icon="solar:shield-check-bold"
+        />
+        <MetricCard
+          label="Đang xử lý"
+          value={documentList.filter((d) => d.status === 'Đang xử lý').length}
+          helper="Chờ xử lý hoặc phát hành"
+          icon="solar:refresh-circle-bold"
+        />
+      </GridRow>
 
-      <Grid container>
-        <Grid item xs={12}>
-          <Stack direction="row" justifyContent="flex-end" sx={{ mb: -1 }}>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Iconify icon={lifecycleExpanded ? 'solar:alt-arrow-up-bold' : 'solar:alt-arrow-down-bold'} />}
-              onClick={() => setLifecycleExpanded((prev) => !prev)}
-            >
-              {lifecycleExpanded ? 'Thu gọn' : 'Mở rộng'}
-            </Button>
-          </Stack>
-        </Grid>
-        <Grid item xs={12} lg={8}>
+      <Stack direction="row" justifyContent="flex-end">
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<Iconify icon={lifecycleExpanded ? 'solar:alt-arrow-up-bold' : 'solar:alt-arrow-down-bold'} />}
+          onClick={() => setLifecycleExpanded((prev) => !prev)}
+        >
+          {lifecycleExpanded ? 'Thu gọn' : 'Mở rộng'}
+        </Button>
+      </Stack>
+      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>
+        <Box>
           <SectionCard
             title="Vòng đời văn bản"
             subtitle="Chuỗi xử lý từ tạo mới đến lưu trữ hoặc hủy."
           >
             {lifecycleExpanded && (
-              <Grid container spacing={1.5}>
+              <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: 'repeat(2,1fr)', sm: 'repeat(3,1fr)', md: 'repeat(5,1fr)' } }}>
                 {documentLifecycle.map((step, index) => (
-                  <Grid key={step} item xs={6} sm={4} md={2.4}>
-                    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'background.neutral', textAlign: 'center' }}>
-                      <Typography variant="overline" color="text.secondary" display="block">
-                        Bước {index + 1}
-                      </Typography>
-                      <Typography variant="subtitle2">{step}</Typography>
-                    </Box>
-                  </Grid>
+                  <Box key={step} sx={{ p: 1.5, borderRadius: 2, bgcolor: 'background.neutral', textAlign: 'center' }}>
+                    <Typography variant="overline" color="text.secondary" display="block">
+                      Bước {index + 1}
+                    </Typography>
+                    <Typography variant="subtitle2">{step}</Typography>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
             )}
             {!lifecycleExpanded && (
               <Typography variant="body2" color="text.secondary">
@@ -550,9 +539,9 @@ export default function DocumentManagementPage() {
               </Typography>
             )}
           </SectionCard>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} lg={4}>
+        <Box>
           <SectionCard
             title="Ký số & lưu trữ"
             subtitle="Những điểm chính trong luồng xử lý văn bản."
@@ -581,8 +570,8 @@ export default function DocumentManagementPage() {
               </Typography>
             )}
           </SectionCard>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       <SectionCard
         title="Danh sách văn bản"

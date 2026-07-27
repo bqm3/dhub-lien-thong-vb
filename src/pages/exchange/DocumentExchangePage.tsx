@@ -27,6 +27,7 @@ import {
 } from '../../sections/interoperability/mockData';
 import {
   DataTable,
+  GridRow,
   MetricCard,
   PageShell,
   SectionCard,
@@ -331,20 +332,12 @@ export default function DocumentExchangePage() {
     >
 
       {/* ── Metrics ── */}
-      <Grid container>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Tổng giao dịch" value={stats.total} helper="Trong tất cả thời gian" icon="solar:inbox-in-bold" />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Tỷ lệ thành công" value={`${Math.round((stats.received / Math.max(stats.total, 1)) * 100)}%`} helper={`${stats.received} giao dịch RECEIVED`} icon="solar:check-read-bold" />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Đang chờ ACK" value={stats.waiting} helper="WAITING — chưa nhận xác nhận" icon="solar:chat-round-line-bold" />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Lỗi / Retry" value={`${stats.failed} / ${stats.retrying}`} helper="Failed cần xử lý thủ công" icon="solar:restart-bold" />
-        </Grid>
-      </Grid>
+      <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
+        <MetricCard label="Tổng giao dịch" value={stats.total} helper="Trong tất cả thời gian" icon="solar:inbox-in-bold" />
+        <MetricCard label="Tỷ lệ thành công" value={`${Math.round((stats.received / Math.max(stats.total, 1)) * 100)}%`} helper={`${stats.received} giao dịch RECEIVED`} icon="solar:check-read-bold" />
+        <MetricCard label="Đang chờ ACK" value={stats.waiting} helper="WAITING — chưa nhận xác nhận" icon="solar:chat-round-line-bold" />
+        <MetricCard label="Lỗi / Retry" value={`${stats.failed} / ${stats.retrying}`} helper="Failed cần xử lý thủ công" icon="solar:restart-bold" />
+      </GridRow>
 
       {/* ── Bảng Delivery Tracking ── */}
       <SectionCard
