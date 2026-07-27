@@ -1,26 +1,11 @@
 import type { ComponentType } from 'react';
 import { Box, Button, Grid, Stack, Typography } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
 import * as Recharts from 'recharts';
 import Iconify from '../../components/iconify';
-import { PATH_DASHBOARD } from '../../routes/paths';
 import { DataTable, MetricCard, PageShell, SectionCard } from '../../sections/interoperability/components';
-import { reportOrder, reportingData, ReportSectionKey } from './reportingData';
+import { reportingData, ReportSectionKey } from './reportingData';
 
 type ReportSectionPageProps = { section: ReportSectionKey };
-
-const paths: Record<ReportSectionKey, string> = {
-  executive: PATH_DASHBOARD.operations.reporting.executive,
-  document: PATH_DASHBOARD.operations.reporting.document,
-  incoming: PATH_DASHBOARD.operations.reporting.incoming,
-  type: PATH_DASHBOARD.operations.reporting.type,
-  delivery: PATH_DASHBOARD.operations.reporting.delivery,
-  error: PATH_DASHBOARD.operations.reporting.error,
-  retry: PATH_DASHBOARD.operations.reporting.retry,
-  agency: PATH_DASHBOARD.operations.reporting.agency,
-  daily: PATH_DASHBOARD.operations.reporting.daily,
-  export: PATH_DASHBOARD.operations.reporting.export,
-};
 
 const pieColors = ['#1976D2', '#2EAD6B', '#F59E0B', '#E34D59', '#7C4DFF', '#00A6C8'];
 
@@ -82,16 +67,16 @@ export default function ReportSectionPage({ section }: ReportSectionPageProps) {
   const config = reportingData[section];
   return (
     <PageShell title={config.title} subtitle={config.subtitle}>
-      <SectionCard title="Danh mục báo cáo" subtitle="Chuyển nhanh giữa các báo cáo nghiệp vụ."><Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>{reportOrder.map((item, index) => <Button key={item.key} component={RouterLink} to={paths[item.key]} variant={item.key === section ? 'contained' : 'outlined'} size="small">{index + 1}. {item.label}</Button>)}</Stack></SectionCard>
+      {/* <SectionCard title="Danh mục báo cáo" subtitle="Chuyển nhanh giữa các báo cáo nghiệp vụ."><Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>{reportOrder.map((item, index) => <Button key={item.key} component={RouterLink} to={paths[item.key]} variant={item.key === section ? 'contained' : 'outlined'} size="small">{index + 1}. {item.label}</Button>)}</Stack></SectionCard> */}
 
-      <Grid container spacing={3}>{config.metrics.map((metric) => <Grid key={metric.label} item xs={12} sm={6} lg={3} gap={1}><MetricCard label={metric.label} value={metric.value} helper={metric.helper} icon={metric.icon} /></Grid>)}</Grid>
+      <Grid container>{config.metrics.map((metric) => <Grid key={metric.label} item xs={12} sm={6} lg={3} gap={1}><MetricCard label={metric.label} value={metric.value} helper={metric.helper} icon={metric.icon} /></Grid>)}</Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} lg={8}><SectionCard title={config.trendTitle} subtitle={config.trendSubtitle}><TrendChart data={config.trendData} series={config.trendSeries} /></SectionCard></Grid>
         <Grid item xs={12} lg={4}><SectionCard title={config.distributionTitle} subtitle={config.distributionSubtitle}><DistributionChart data={config.distributionData} /></SectionCard></Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} lg={8}><SectionCard title={config.breakdownTitle} subtitle={config.breakdownSubtitle}><BreakdownChart data={config.breakdownData} series={config.breakdownSeries} /></SectionCard></Grid>
         <Grid item xs={12} lg={4}><SectionCard title="Nhận định nổi bật" subtitle="Gợi ý nhanh từ dữ liệu mô phỏng trong kỳ."><Stack spacing={2}>{config.insights.map((insight, index) => <Stack key={insight} direction="row" spacing={1.5} alignItems="flex-start"><Box sx={{ width: 30, height: 30, borderRadius: 1.5, display: 'grid', placeItems: 'center', flexShrink: 0, bgcolor: index === 0 ? 'primary.lighter' : 'background.neutral', color: index === 0 ? 'primary.main' : 'text.secondary' }}><Iconify icon={index === 0 ? 'solar:lightbulb-bold' : 'solar:check-circle-bold'} width={18} /></Box><Typography variant="body2" sx={{ pt: 0.5 }}>{insight}</Typography></Stack>)}{section === 'export' && <Stack spacing={1.25} sx={{ pt: 1 }}><Button variant="contained" startIcon={<Iconify icon="solar:download-bold" />}>Xuất Excel</Button><Button variant="outlined" startIcon={<Iconify icon="solar:file-text-bold" />}>Xuất PDF</Button><Button variant="outlined" startIcon={<Iconify icon="solar:code-bold" />}>Tạo dữ liệu JSON</Button></Stack>}</Stack></SectionCard></Grid>
       </Grid>

@@ -40,7 +40,7 @@ export default function SampleApiPage() {
         />
       </SectionCard>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} lg={6}>
           <SectionCard
             title="Sample Request: Register Agency"
@@ -60,7 +60,7 @@ export default function SampleApiPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} lg={6}>
           <SectionCard
             title="Sample Response: Exchange ACK"

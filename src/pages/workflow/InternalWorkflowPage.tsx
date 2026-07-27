@@ -262,7 +262,7 @@ export default function InternalWorkflowPage() {
       title="Luồng INTERNAL — Duyệt nhiều cấp"
       subtitle="Soạn thảo → duyệt L1/L2/L3... → FINAL → Ký số (kéo thả chữ ký) → Gửi liên thông ra bên ngoài."
     >
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12}>
           <SectionCard
             title="Mẫu luồng INTERNAL (Template)"
@@ -327,7 +327,7 @@ export default function InternalWorkflowPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} lg={4}>
           <SectionCard
             title="Danh sách luồng"
@@ -381,7 +381,7 @@ export default function InternalWorkflowPage() {
             </Tabs>
 
             {tab === 0 && (
-              <Grid container spacing={3}>
+              <Grid container>
                 <Grid item xs={12} md={7}>
                   <Typography variant="subtitle2" sx={{ mb: 2 }}>
                     Chi tiết từng bước duyệt

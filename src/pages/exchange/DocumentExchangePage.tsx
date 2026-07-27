@@ -10,6 +10,10 @@ import {
   DialogTitle,
   Divider,
   Grid,
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Stack,
   Tab,
@@ -42,6 +46,141 @@ const SCENARIO_FILES = [
   { name: '123_QD_UBND.xml', type: 'application/xml', size: '42 KB' },
 ];
 
+type AttachmentPreview = { fileName: string; type: string; size: string };
+
+function AttachmentActionsMenu({
+  file,
+  onPreview,
+}: {
+  file: AttachmentPreview;
+  onPreview: (file: AttachmentPreview) => void;
+}) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  return (
+    <>
+      <IconButton size="small" onClick={(event) => setAnchorEl(event.currentTarget)}>
+        <Iconify icon="eva:more-vertical-fill" width={18} />
+      </IconButton>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            onPreview(file);
+            setAnchorEl(null);
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:eye-bold" width={18} />
+          </ListItemIcon>
+          <ListItemText primary="Xem file" />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setAnchorEl(null);
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:download-bold" width={18} />
+          </ListItemIcon>
+          <ListItemText primary="Tải xuống" />
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
+
+function TransactionActionsMenu({
+  tx,
+  onDetail,
+  onEdit,
+  onReplay,
+  onDelete,
+}: {
+  tx: ExchangeTransaction;
+  onDetail: () => void;
+  onEdit: () => void;
+  onReplay: () => void;
+  onDelete: () => void;
+}) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+  const canReplay = tx.status === 'failed' || tx.status === 'retrying';
+
+  function closeMenu() {
+    setAnchorEl(null);
+  }
+
+  return (
+    <>
+      <IconButton size="small" onClick={(event) => setAnchorEl(event.currentTarget)}>
+        <Iconify icon="eva:more-vertical-fill" width={18} />
+      </IconButton>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={closeMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            onDetail();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:eye-bold" width={18} />
+          </ListItemIcon>
+          <ListItemText primary="Chi tiết" />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            onEdit();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:pen-bold" width={18} />
+          </ListItemIcon>
+          <ListItemText primary="Sửa" />
+        </MenuItem>
+        {canReplay && (
+          <MenuItem
+            onClick={() => {
+              onReplay();
+              closeMenu();
+            }}
+          >
+            <ListItemIcon>
+              <Iconify icon="solar:refresh-bold" width={18} sx={{ color: 'warning.main' }} />
+            </ListItemIcon>
+            <ListItemText primary="Replay" />
+          </MenuItem>
+        )}
+        <MenuItem
+          onClick={() => {
+            onDelete();
+            closeMenu();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:trash-bin-trash-bold" width={18} sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText primary="Xóa" />
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
+
 const emptyForm: ExchangeTransaction = {
   id: '',
   documentCode: '',
@@ -73,6 +212,7 @@ export default function DocumentExchangePage() {
   const [formValues, setFormValues] = useState<ExchangeTransaction>(emptyForm);
   const [detailTx, setDetailTx] = useState<ExchangeTransaction | null>(null);
   const [detailTab, setDetailTab] = useState(0);
+  const [previewFile, setPreviewFile] = useState<AttachmentPreview | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -122,16 +262,13 @@ export default function DocumentExchangePage() {
     ack: <StatusChip status={tx.ack} />,
     retries: tx.retries,
     actions: (
-      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-        <Button size="small" variant="outlined" onClick={() => { setDetailTx(tx); setDetailTab(0); }}>
-          Chi tiết
-        </Button>
-        <Button size="small" onClick={() => handleEdit(tx)}>Sửa</Button>
-        {tx.status === 'failed' || tx.status === 'retrying' ? (
-          <Button size="small" color="warning" onClick={() => handleReplay(tx.id)}>Replay</Button>
-        ) : null}
-        <Button size="small" color="error" onClick={() => handleDelete(tx.id)}>Xóa</Button>
-      </Stack>
+      <TransactionActionsMenu
+        tx={tx}
+        onDetail={() => { setDetailTx(tx); setDetailTab(0); }}
+        onEdit={() => handleEdit(tx)}
+        onReplay={() => handleReplay(tx.id)}
+        onDelete={() => handleDelete(tx.id)}
+      />
     ),
   }));
 
@@ -192,47 +329,9 @@ export default function DocumentExchangePage() {
       title="Document Exchange"
       subtitle="Theo dõi hành trình giao nhận văn bản: gửi từ đâu, qua route nào, đến ai, ACK ra sao, có retry hay phát sinh lỗi không."
     >
-      {/* ── Kịch bản mẫu ── */}
-      <SectionCard
-        title="Kịch bản mẫu"
-        subtitle="Ví dụ điển hình: UBND Hà Nội gửi Quyết định đến 2 đơn vị nhận."
-      >
-        <Grid container spacing={2} alignItems="flex-start">
-          <Grid item xs={12} md={4}>
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-              <Typography variant="overline" color="text.secondary">Hệ thống gửi</Typography>
-              <Typography variant="subtitle2">{SCENARIO_SENDER.unit}</Typography>
-              <Typography variant="caption" color="text.secondary">{SCENARIO_SENDER.person} — {SCENARIO_SENDER.title}</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-              <Typography variant="overline" color="text.secondary">Văn bản</Typography>
-              <Typography variant="subtitle2">123/QD-UBND</Typography>
-              <Typography variant="caption" color="text.secondary">QUYET_DINH — Phê duyệt kế hoạch chuyển đổi số năm 2026</Typography>
-              <Box sx={{ mt: 1 }}>
-                {SCENARIO_FILES.map((f) => (
-                  <Stack key={f.name} direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                    <Iconify icon="solar:paperclip-2-bold" width={14} sx={{ color: 'primary.main' }} />
-                    <Typography variant="caption">{f.name} ({f.size})</Typography>
-                  </Stack>
-                ))}
-              </Box>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-              <Typography variant="overline" color="text.secondary">Hệ thống nhận</Typography>
-              {SCENARIO_RECEIVERS.map((r) => (
-                <Typography key={r} variant="subtitle2">• {r}</Typography>
-              ))}
-            </Box>
-          </Grid>
-        </Grid>
-      </SectionCard>
 
       {/* ── Metrics ── */}
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard label="Tổng giao dịch" value={stats.total} helper="Trong tất cả thời gian" icon="solar:inbox-in-bold" />
         </Grid>
@@ -249,7 +348,7 @@ export default function DocumentExchangePage() {
 
       {/* ── Bảng Delivery Tracking ── */}
       <SectionCard
-        title="Delivery Tracking"
+        title="Theo dõi giao dịch"
         subtitle="Lịch sử giao dịch liên thông. Bấm Transaction ID hoặc Chi tiết để xem đầy đủ thông tin, lý do lỗi, thời gian gửi/nhận."
         action={
           <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={handleOpenCreate}>
@@ -361,15 +460,47 @@ export default function DocumentExchangePage() {
 
               {detailTab === 1 && (
                 <DataTable
+                  minWidth={780}
                   columns={[
-                    { key: 'fileName', label: 'Tên file' },
-                    { key: 'type', label: 'Loại' },
-                    { key: 'size', label: 'Kích thước', align: 'right' },
-                    { key: 'uploadedAt', label: 'Upload lúc' },
+                    { key: 'fileName', label: 'Tên file', width: 220 },
+                    { key: 'type', label: 'Loại', width: 180 },
+                    { key: 'size', label: 'Kích thước', align: 'right', width: 110 },
+                    { key: 'uploadedAt', label: 'Upload lúc', width: 150 },
+                    { key: 'actions', label: 'Thao tác', align: 'center', width: 90 },
                   ]}
                   rows={[
-                    { fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.pdf`, type: 'application/pdf', size: '2.1 MB', uploadedAt: detailTx.sentAt || detailTx.updatedAt },
-                    { fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.xml`, type: 'application/xml', size: '38 KB', uploadedAt: detailTx.sentAt || detailTx.updatedAt },
+                    {
+                      fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.pdf`,
+                      type: 'application/pdf',
+                      size: '2.1 MB',
+                      uploadedAt: detailTx.sentAt || detailTx.updatedAt,
+                      actions: (
+                        <AttachmentActionsMenu
+                          file={{
+                            fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.pdf`,
+                            type: 'application/pdf',
+                            size: '2.1 MB',
+                          }}
+                          onPreview={setPreviewFile}
+                        />
+                      ),
+                    },
+                    {
+                      fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.xml`,
+                      type: 'application/xml',
+                      size: '38 KB',
+                      uploadedAt: detailTx.sentAt || detailTx.updatedAt,
+                      actions: (
+                        <AttachmentActionsMenu
+                          file={{
+                            fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.xml`,
+                            type: 'application/xml',
+                            size: '38 KB',
+                          }}
+                          onPreview={setPreviewFile}
+                        />
+                      ),
+                    },
                   ]}
                 />
               )}
@@ -455,6 +586,37 @@ export default function DocumentExchangePage() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      <Dialog open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Xem file đính kèm</DialogTitle>
+        <DialogContent>
+          {previewFile && (
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Iconify
+                    icon={previewFile.type.includes('pdf') ? 'solar:file-text-bold' : 'solar:code-file-bold'}
+                    width={28}
+                    sx={{ color: 'primary.main' }}
+                  />
+                  <Box>
+                    <Typography variant="subtitle1">{previewFile.fileName}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {previewFile.type} · {previewFile.size}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+              <Alert severity="info">
+                Đây là bản xem nhanh demo. Nội dung file thực tế sẽ được tải từ kho lưu trữ khi kết nối backend.
+              </Alert>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewFile(null)}>Đóng</Button>
+        </DialogActions>
       </Dialog>
 
       {/* ── Dialog Thêm/Sửa ── */}

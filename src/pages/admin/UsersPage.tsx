@@ -148,7 +148,7 @@ export default function UsersPage() {
       title="Người dùng"
       subtitle="Danh sách tài khoản, thông tin cán bộ, đơn vị, vai trò. CRUD tách riêng theo màn hình; Create/Update/Delete đều thao tác bằng popup modal."
     >
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard
             label="Tổng người dùng"
@@ -183,7 +183,7 @@ export default function UsersPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12}>
           <SectionCard
             title="Danh sách người dùng"

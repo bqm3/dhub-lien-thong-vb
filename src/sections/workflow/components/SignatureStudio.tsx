@@ -8,6 +8,8 @@ import {
   IconButton,
   Pagination,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -50,13 +52,21 @@ type SignaturePosition = {
   scale: number;
 };
 
+type SignatureFileItem = {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+};
+
 export default function SignatureStudio({
   fileName,
   fileUrl,
+  files,
   onSignComplete,
 }: {
   fileName?: string;
   fileUrl?: string;
+  files?: { fileName: string; fileUrl?: string }[];
   onSignComplete?: (signatures: PlacedSignature[]) => void;
 }) {
   const theme = useTheme();
@@ -72,12 +82,31 @@ export default function SignatureStudio({
     posId: string;
   } | null>(null);
 
-  const [uploadedName, setUploadedName] = useState(fileName ?? '');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(fileUrl ?? null);
+  const initialFiles: SignatureFileItem[] = (() => {
+    if (files && files.length > 0) {
+      return files
+        .filter((item) => item.fileName)
+        .map((item, index) => ({
+          id: `prop_${index}_${item.fileName}`,
+          fileName: item.fileName,
+          fileUrl: item.fileUrl || '',
+        }));
+    }
+    if (fileName) {
+      return [{ id: `prop_0_${fileName}`, fileName, fileUrl: fileUrl || '' }];
+    }
+    return [];
+  })();
+
+  const [fileList, setFileList] = useState<SignatureFileItem[]>(initialFiles);
+  const [openTabIds, setOpenTabIds] = useState<string[]>(initialFiles[0] ? [initialFiles[0].id] : []);
+  const [activeFileId, setActiveFileId] = useState<string | null>(initialFiles[0]?.id ?? null);
+  const [uploadedName, setUploadedName] = useState(initialFiles[0]?.fileName ?? '');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialFiles[0]?.fileUrl || null);
   const [signatureLink, setSignatureLink] = useState<string | null>(null);
   const [positionsList, setPositionsList] = useState<SignaturePosition[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(Boolean(fileUrl));
+  const [isLoading, setIsLoading] = useState(Boolean(initialFiles[0]?.fileUrl));
   const [retryCount, setRetryCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -88,13 +117,12 @@ export default function SignatureStudio({
 
   const isPdf = uploadedName.toLowerCase().endsWith('.pdf');
   const isImage = Boolean(previewUrl && !isPdf && /\.(png|jpe?g|gif|webp)$/i.test(uploadedName));
+  const openTabs = fileList.filter((item) => openTabIds.indexOf(item.id) !== -1);
 
-  useEffect(() => {
-    setUploadedName(fileName ?? '');
-  }, [fileName]);
-
-  useEffect(() => {
-    setPreviewUrl(fileUrl ?? null);
+  const loadFileContent = useCallback((item: SignatureFileItem) => {
+    setActiveFileId(item.id);
+    setUploadedName(item.fileName);
+    setPreviewUrl(item.fileUrl || null);
     setPositionsList([]);
     setCurrentPage(1);
     setTotalPages(0);
@@ -102,15 +130,83 @@ export default function SignatureStudio({
     setError(null);
     setRetryCount(0);
 
-    if (!fileUrl) {
-      setIsLoading(false);
-      return;
-    }
+    const isPdfFile = item.fileName.toLowerCase().endsWith('.pdf');
+    const isImageFile = /\.(png|jpe?g|gif|webp)$/i.test(item.fileName);
+    setIsLoading(Boolean(item.fileUrl) && (isPdfFile || isImageFile));
+  }, []);
 
-    const isPdfFile = (fileName ?? '').toLowerCase().endsWith('.pdf');
-    const isImageFile = /\.(png|jpe?g|gif|webp)$/i.test(fileName ?? '');
-    setIsLoading(isPdfFile || isImageFile);
-  }, [fileUrl, fileName]);
+  const openFileTab = useCallback(
+    (item: SignatureFileItem) => {
+      setOpenTabIds((prev) => (prev.indexOf(item.id) !== -1 ? prev : [...prev, item.id]));
+      loadFileContent(item);
+    },
+    [loadFileContent]
+  );
+
+  const closeFileTab = useCallback(
+    (fileId: string) => {
+      setOpenTabIds((prev) => {
+        const nextIds = prev.filter((id) => id !== fileId);
+        const wasActive = activeFileId === fileId;
+
+        if (wasActive) {
+          if (nextIds.length > 0) {
+            const fallback = fileList.find((item) => item.id === nextIds[nextIds.length - 1]);
+            if (fallback) {
+              loadFileContent(fallback);
+            }
+          } else {
+            setActiveFileId(null);
+            setUploadedName('');
+            setPreviewUrl(null);
+            setPositionsList([]);
+            setCurrentPage(1);
+            setTotalPages(0);
+            setPageDimensions({ width: 0, height: 0 });
+            setError(null);
+            setIsLoading(false);
+          }
+        }
+
+        return nextIds;
+      });
+    },
+    [activeFileId, fileList, loadFileContent]
+  );
+
+  useEffect(() => {
+    const nextFiles =
+      files && files.length > 0
+        ? files
+            .filter((item) => item.fileName)
+            .map((item, index) => ({
+              id: `prop_${index}_${item.fileName}`,
+              fileName: item.fileName,
+              fileUrl: item.fileUrl || '',
+            }))
+        : fileName
+          ? [{ id: `prop_0_${fileName}`, fileName, fileUrl: fileUrl || '' }]
+          : [];
+
+    setFileList(nextFiles);
+    if (nextFiles.length > 0) {
+      setOpenTabIds([nextFiles[0].id]);
+      loadFileContent(nextFiles[0]);
+    } else {
+      setOpenTabIds([]);
+      setActiveFileId(null);
+      setUploadedName('');
+      setPreviewUrl(null);
+      setIsLoading(false);
+    }
+    // Intentionally sync when source file identity changes, not on every new array reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    fileName,
+    fileUrl,
+    loadFileContent,
+    JSON.stringify((files ?? []).map((item) => `${item.fileName}|${item.fileUrl ?? ''}`)),
+  ]);
 
   useEffect(() => {
     return () => {
@@ -152,18 +248,18 @@ export default function SignatureStudio({
   };
 
   const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const selected = Array.from(event.target.files ?? []);
+    if (selected.length === 0) return;
 
-    setUploadedName(file.name);
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    setPositionsList([]);
-    setCurrentPage(1);
-    setTotalPages(0);
-    setPageDimensions({ width: 0, height: 0 });
-    setError(null);
-    setIsLoading(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+    const nextItems: SignatureFileItem[] = selected.map((file, index) => ({
+      id: `local_${Date.now()}_${index}_${file.name}`,
+      fileName: file.name,
+      fileUrl: URL.createObjectURL(file),
+    }));
+
+    setFileList((prev) => [...prev, ...nextItems]);
+    // Chỉ mở tab file đầu tiên trong lần chọn; các file còn lại nằm trong danh sách để mở khi cần.
+    openFileTab(nextItems[0]);
     event.target.value = '';
   };
 
@@ -431,7 +527,7 @@ export default function SignatureStudio({
       sx={{
         position: 'relative',
         boxShadow: 3,
-        borderRadius: 1,
+        borderRadius: 0,
         overflow: 'hidden',
         bgcolor: 'common.white',
         maxWidth: `${PDF_BASE_WIDTH}px`,
@@ -486,7 +582,7 @@ export default function SignatureStudio({
       sx={{
         position: 'relative',
         boxShadow: 3,
-        borderRadius: 1,
+        borderRadius: 0,
         overflow: 'hidden',
         bgcolor: 'common.white',
         maxWidth: `${PDF_BASE_WIDTH * scale}px`,
@@ -508,7 +604,7 @@ export default function SignatureStudio({
   );
 
   return (
-    <Grid container spacing={0} sx={{ minHeight: 560, border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+    <Grid container spacing={0} sx={{ minHeight: 560, border: '1px solid', borderColor: 'divider', borderRadius: 0, overflow: 'hidden' }}>
       <Grid item xs={12} md={3}>
         <Box
           sx={{
@@ -569,17 +665,71 @@ export default function SignatureStudio({
             startIcon={<Iconify icon="solar:document-bold" />}
           >
             Chọn file văn bản
-            <input hidden type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={handleDocumentUpload} />
+            <input hidden type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple onChange={handleDocumentUpload} />
           </Button>
 
-          {uploadedName && (
-            <Typography variant="caption" color="text.secondary">
-              File: {uploadedName}
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Danh sách văn bản ({fileList.length})
             </Typography>
-          )}
+            {fileList.length === 0 ? (
+              <Typography variant="caption" color="text.secondary">
+                Chưa có file upload.
+              </Typography>
+            ) : (
+              <Stack spacing={1} sx={{ maxHeight: 220, overflowY: 'auto' }}>
+                {fileList.map((item) => {
+                  const isOpen = openTabIds.indexOf(item.id) !== -1;
+                  const isActive = item.id === activeFileId;
+                  return (
+                    <Box
+                      key={item.id}
+                      onClick={() => openFileTab(item)}
+                      sx={{
+                        p: 1.25,
+                        cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: isActive ? 'primary.main' : 'divider',
+                        bgcolor: isActive ? 'primary.lighter' : 'common.white',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1,
+                      }}
+                    >
+                      <Iconify
+                        icon={item.fileName.toLowerCase().endsWith('.pdf') ? 'solar:file-text-bold' : 'solar:gallery-bold'}
+                        width={18}
+                        sx={{ mt: 0.25, color: isActive ? 'primary.main' : 'text.secondary', flexShrink: 0 }}
+                      />
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: 'block',
+                            wordBreak: 'break-word',
+                            color: isActive ? 'primary.darker' : 'text.primary',
+                            fontWeight: isActive ? 600 : 400,
+                          }}
+                        >
+                          {item.fileName}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {isOpen ? (isActive ? 'Đang mở' : 'Đã mở tab') : 'Bấm để mở tab'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
 
           <Alert severity="info" sx={{ mt: 'auto' }}>
             <Typography variant="caption" component="div">
+              File đang mở: {uploadedName || '—'}
+              <br />
+              Tab đang mở: {openTabs.length}/{fileList.length}
+              <br />
               Trang {currentPage}/{totalPages || 1}
               <br />
               Kích thước: {Math.round(pageDimensions.width)} x {Math.round(pageDimensions.height)}px
@@ -598,6 +748,73 @@ export default function SignatureStudio({
 
       <Grid item xs={12} md={9}>
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 560 }}>
+          {openTabs.length > 0 && (
+            <Tabs
+              value={activeFileId ?? false}
+              onChange={(_, value: string) => {
+                const next = openTabs.find((item) => item.id === value);
+                if (next) loadFileContent(next);
+              }}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                minHeight: 44,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                px: 1,
+                '& .MuiTab-root': {
+                  minHeight: 44,
+                  textTransform: 'none',
+                  maxWidth: 280,
+                },
+              }}
+            >
+              {openTabs.map((item) => (
+                <Tab
+                  key={item.id}
+                  value={item.id}
+                  label={
+                    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ maxWidth: 240 }}>
+                      <Iconify
+                        icon={item.fileName.toLowerCase().endsWith('.pdf') ? 'solar:file-text-bold' : 'solar:gallery-bold'}
+                        width={16}
+                      />
+                      <Typography variant="body2" noWrap title={item.fileName} sx={{ maxWidth: 160 }}>
+                        {item.fileName}
+                      </Typography>
+                      <Box
+                        component="span"
+                        role="button"
+                        aria-label={`Đóng ${item.fileName}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          closeFileTab(item.id);
+                        }}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        sx={{
+                          width: 18,
+                          height: 18,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '50%',
+                          color: 'text.secondary',
+                          '&:hover': {
+                            bgcolor: 'action.hover',
+                            color: 'error.main',
+                          },
+                        }}
+                      >
+                        <Iconify icon="eva:close-fill" width={14} />
+                      </Box>
+                    </Stack>
+                  }
+                />
+              ))}
+            </Tabs>
+          )}
+
           <Box
             ref={containerRef}
             sx={{
@@ -627,7 +844,11 @@ export default function SignatureStudio({
 
             {!previewUrl && (
               <Box sx={{ textAlign: 'center', py: 8 }}>
-                <Typography color="text.secondary">Chưa có file để hiển thị. Vui lòng chọn file văn bản.</Typography>
+                <Typography color="text.secondary">
+                  {fileList.length === 0
+                    ? 'Chưa có file để hiển thị. Vui lòng chọn file văn bản.'
+                    : 'Chưa có tab nào đang mở. Bấm một file ở danh sách bên trái để mở.'}
+                </Typography>
               </Box>
             )}
 

@@ -144,7 +144,7 @@ export default function UnitsPage() {
       title="Đơn vị"
       subtitle="Quản lý tổ chức/đơn vị: cơ quan gửi/nhận, mã định danh đơn vị, sơ đồ tổ chức. CRUD rõ ràng với popup modal."
     >
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard
             label="Tổng đơn vị"
@@ -179,7 +179,7 @@ export default function UnitsPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12}>
           <SectionCard
             title="Danh sách đơn vị"

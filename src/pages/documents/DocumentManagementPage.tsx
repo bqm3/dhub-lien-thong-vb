@@ -11,6 +11,10 @@ import {
   DialogTitle,
   Divider,
   Grid,
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Stack,
   Tab,
@@ -39,6 +43,73 @@ type ManagedDocumentRecord = DocumentRecord & {
   signStatus: string;
   signedPositions: number;
 };
+
+function DocumentActionsMenu({
+  onDetail,
+  onEdit,
+  onDelete,
+}: {
+  onDetail: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  function closeMenu() {
+    setAnchorEl(null);
+  }
+
+  return (
+    <>
+      <IconButton size="small" onClick={(event) => setAnchorEl(event.currentTarget)}>
+        <Iconify icon="eva:more-vertical-fill" width={18} />
+      </IconButton>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={closeMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            onDetail();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:eye-bold" width={18} />
+          </ListItemIcon>
+          <ListItemText primary="Chi tiết" />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            onEdit();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:pen-bold" width={18} />
+          </ListItemIcon>
+          <ListItemText primary="Sửa" />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            onDelete();
+            closeMenu();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon>
+            <Iconify icon="solar:trash-bin-trash-bold" width={18} sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText primary="Xóa" />
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
 
 const emptyDocumentForm: ManagedDocumentRecord = {
   code: '',
@@ -157,9 +228,10 @@ export default function DocumentManagementPage() {
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ManagedDocumentRecord>(emptyDocumentForm);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [formAttachmentPreviewUrl, setFormAttachmentPreviewUrl] = useState<string | undefined>(undefined);
+  const [formAttachmentPreviewUrls, setFormAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [detailDoc, setDetailDoc] = useState<ManagedDocumentRecord | null>(null);
   const [detailTab, setDetailTab] = useState(0);
+  const [lifecycleExpanded, setLifecycleExpanded] = useState(false);
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
@@ -208,19 +280,19 @@ export default function DocumentManagementPage() {
   }, [detailDoc, documentList]);
 
   useEffect(() => {
-    const currentAttachment = formValues.attachments[0];
-    const file = currentAttachment ? attachmentFiles.find((item) => item.name === currentAttachment) : undefined;
+    const nextUrls: Record<string, string> = {};
 
-    if (!file) {
-      setFormAttachmentPreviewUrl(undefined);
-      return undefined;
-    }
+    formValues.attachments.forEach((name) => {
+      const file = attachmentFiles.find((item) => item.name === name);
+      if (file) {
+        nextUrls[name] = URL.createObjectURL(file);
+      }
+    });
 
-    const nextUrl = URL.createObjectURL(file);
-    setFormAttachmentPreviewUrl(nextUrl);
+    setFormAttachmentPreviewUrls(nextUrls);
 
     return () => {
-      URL.revokeObjectURL(nextUrl);
+      Object.values(nextUrls).forEach((url) => URL.revokeObjectURL(url));
     };
   }, [attachmentFiles, formValues.attachments]);
 
@@ -256,13 +328,11 @@ export default function DocumentManagementPage() {
     status: <StatusChip status={d.status} />,
     createdAt: d.createdAt,
     actions: (
-      <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <Button size="small" variant="outlined" onClick={() => handleOpenDetail(d.code)}>
-          Chi tiết
-        </Button>
-        <Button size="small" onClick={() => handleEdit(d)}>Sửa</Button>
-        <Button size="small" color="error" onClick={() => handleDelete(d.code)}>Xóa</Button>
-      </Stack>
+      <DocumentActionsMenu
+        onDetail={() => handleOpenDetail(d.code)}
+        onEdit={() => handleEdit(d)}
+        onDelete={() => handleDelete(d.code)}
+      />
     ),
   }));
 
@@ -407,7 +477,7 @@ export default function DocumentManagementPage() {
       title="Document Management"
       subtitle="Quản lý toàn bộ vòng đời văn bản điện tử: tạo mới, metadata, file đính kèm, ký số, gửi nhận, lưu trữ và tra cứu trên một màn hình."
     >
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard
             label="Tổng văn bản"
@@ -442,43 +512,74 @@ export default function DocumentManagementPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
+        <Grid item xs={12}>
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: -1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Iconify icon={lifecycleExpanded ? 'solar:alt-arrow-up-bold' : 'solar:alt-arrow-down-bold'} />}
+              onClick={() => setLifecycleExpanded((prev) => !prev)}
+            >
+              {lifecycleExpanded ? 'Thu gọn' : 'Mở rộng'}
+            </Button>
+          </Stack>
+        </Grid>
         <Grid item xs={12} lg={8}>
-          <SectionCard title="Document Lifecycle" subtitle="Chuỗi xử lý từ tạo mới đến lưu trữ hoặc hủy.">
-            <Grid container spacing={1.5}>
-              {documentLifecycle.map((step, index) => (
-                <Grid key={step} item xs={6} sm={4} md={2.4}>
-                  <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'background.neutral', textAlign: 'center' }}>
-                    <Typography variant="overline" color="text.secondary" display="block">
-                      Bước {index + 1}
-                    </Typography>
-                    <Typography variant="subtitle2">{step}</Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
+          <SectionCard
+            title="Vòng đời văn bản"
+            subtitle="Chuỗi xử lý từ tạo mới đến lưu trữ hoặc hủy."
+          >
+            {lifecycleExpanded && (
+              <Grid container spacing={1.5}>
+                {documentLifecycle.map((step, index) => (
+                  <Grid key={step} item xs={6} sm={4} md={2.4}>
+                    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'background.neutral', textAlign: 'center' }}>
+                      <Typography variant="overline" color="text.secondary" display="block">
+                        Bước {index + 1}
+                      </Typography>
+                      <Typography variant="subtitle2">{step}</Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+            {!lifecycleExpanded && (
+              <Typography variant="body2" color="text.secondary">
+                Đã thu gọn {documentLifecycle.length} bước vòng đời văn bản. Bấm &quot;Mở rộng&quot; để xem chi tiết.
+              </Typography>
+            )}
           </SectionCard>
         </Grid>
 
         <Grid item xs={12} lg={4}>
-          <SectionCard title="Ký số & lưu trữ" subtitle="Những điểm chính trong luồng xử lý văn bản.">
-            <Stack spacing={1.5}>
-              {[
-                { icon: 'solar:shield-check-bold', label: 'Bắt buộc ký số', text: 'Luồng thêm mới hỗ trợ tải tệp và mở popup ký số ngay trong form.' },
-                { icon: 'solar:folder-bold', label: 'Lưu trữ tệp', text: 'Mỗi văn bản có thể chứa nhiều tệp đính kèm để theo dõi bản chính và phụ lục.' },
-                { icon: 'solar:clipboard-list-bold', label: 'Audit Trail', text: 'Ghi nhận thao tác tạo, tải tệp, ký số, phát hành và gửi liên thông.' },
-              ].map((item) => (
-                <Box key={item.label} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                  <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                    <Iconify icon={item.icon} width={20} sx={{ mt: 0.25, color: 'primary.main', flexShrink: 0 }} />
-                    <Box>
-                      <Typography variant="subtitle2">{item.label}</Typography>
-                      <Typography variant="body2" color="text.secondary">{item.text}</Typography>
-                    </Box>
-                  </Stack>
-                </Box>
-              ))}
-            </Stack>
+          <SectionCard
+            title="Ký số & lưu trữ"
+            subtitle="Những điểm chính trong luồng xử lý văn bản."
+          >
+            {lifecycleExpanded ? (
+              <Stack spacing={1.5}>
+                {[
+                  { icon: 'solar:shield-check-bold', label: 'Bắt buộc ký số', text: 'Luồng thêm mới hỗ trợ tải tệp và mở popup ký số ngay trong form.' },
+                  { icon: 'solar:folder-bold', label: 'Lưu trữ tệp', text: 'Mỗi văn bản có thể chứa nhiều tệp đính kèm để theo dõi bản chính và phụ lục.' },
+                  { icon: 'solar:clipboard-list-bold', label: 'Nhật ký kiểm toán', text: 'Ghi nhận thao tác tạo, tải tệp, ký số, phát hành và gửi liên thông.' },
+                ].map((item) => (
+                  <Box key={item.label} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
+                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                      <Iconify icon={item.icon} width={20} sx={{ mt: 0.25, color: 'primary.main', flexShrink: 0 }} />
+                      <Box>
+                        <Typography variant="subtitle2">{item.label}</Typography>
+                        <Typography variant="body2" color="text.secondary">{item.text}</Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Đã thu gọn phần ký số &amp; lưu trữ. Bấm &quot;Mở rộng&quot; để xem chi tiết.
+              </Typography>
+            )}
           </SectionCard>
         </Grid>
       </Grid>
@@ -615,8 +716,10 @@ export default function DocumentManagementPage() {
                   </Box>
 
                   <SignatureStudio
-                    fileName={detailDoc.attachments[0]}
-                    fileUrl={getDemoAttachmentUrl(detailDoc.code, detailDoc.attachments[0])}
+                    files={detailDoc.attachments.map((name) => ({
+                      fileName: name,
+                      fileUrl: getDemoAttachmentUrl(detailDoc.code, name),
+                    }))}
                     onSignComplete={async (signatures) => {
                       const updatedDoc: ManagedDocumentRecord = {
                         ...detailDoc,
@@ -832,8 +935,10 @@ export default function DocumentManagementPage() {
         </DialogTitle>
         <DialogContent dividers>
           <SignatureStudio
-            fileName={formValues.attachments[0]}
-            fileUrl={formAttachmentPreviewUrl ?? getDemoAttachmentUrl(formValues.code, formValues.attachments[0])}
+            files={formValues.attachments.map((name) => ({
+              fileName: name,
+              fileUrl: formAttachmentPreviewUrls[name] ?? getDemoAttachmentUrl(formValues.code, name),
+            }))}
             onSignComplete={(signatures) => {
               setFormValues((prev) => ({
                 ...prev,

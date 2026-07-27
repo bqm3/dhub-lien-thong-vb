@@ -46,11 +46,14 @@ type TableColumn<T> = {
   key: keyof T;
   label: string;
   align?: 'left' | 'right' | 'center';
+  width?: number | string;
 };
 
 type DataTableProps<T extends Record<string, ReactNode>> = {
   columns: TableColumn<T>[];
   rows: T[];
+  minWidth?: number | string;
+  maxHeight?: number | string;
 };
 
 export function PageShell({ title, subtitle, children }: ShellProps) {
@@ -81,7 +84,7 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
             <Typography variant="h3" sx={{ mt: 1, mb: 1 }}>
               {title}
             </Typography>
-            <Typography variant="body1" sx={{ mx: 'auto', opacity: 0.88 }}>
+            <Typography variant="body1" sx={{ opacity: 0.88 }}>
               {subtitle}
             </Typography>
           </Box>
@@ -196,7 +199,12 @@ export function ProgressList({ items }: { items: { label: string; value: number 
   );
 }
 
-export function DataTable<T extends Record<string, ReactNode>>({ columns, rows }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, ReactNode>>({
+  columns,
+  rows,
+  minWidth = 960,
+  maxHeight = 480,
+}: DataTableProps<T>) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -205,12 +213,20 @@ export function DataTable<T extends Record<string, ReactNode>>({ columns, rows }
 
   return (
     <Stack spacing={1.5}>
-      <TableContainer sx={{ overflowX: 'auto' }}>
-        <Table size="small" sx={{ minWidth: 960 }}>
+      <TableContainer sx={{ maxHeight, overflow: 'auto' }}>
+        <Table stickyHeader size="small" sx={{ minWidth }}>
           <TableHead>
             <TableRow>
               {columns.map((column) => (
-                <TableCell key={String(column.key)} align={column.align || 'left'}>
+                <TableCell
+                  key={String(column.key)}
+                  align={column.align || 'left'}
+                  sx={{
+                    width: column.width,
+                    minWidth: column.width,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {column.label}
                 </TableCell>
               ))}
@@ -219,11 +235,41 @@ export function DataTable<T extends Record<string, ReactNode>>({ columns, rows }
           <TableBody>
             {paginatedRows.map((row, index) => (
               <TableRow key={index}>
-                {columns.map((column) => (
-                  <TableCell key={String(column.key)} align={column.align || 'left'}>
-                    {row[column.key]}
-                  </TableCell>
-                ))}
+                {columns.map((column) => {
+                  const value = row[column.key];
+                  const isPlainText = typeof value === 'string' || typeof value === 'number';
+
+                  return (
+                    <TableCell
+                      key={String(column.key)}
+                      align={column.align || 'left'}
+                      sx={{
+                        width: column.width,
+                        minWidth: column.width,
+                        verticalAlign: 'middle',
+                        whiteSpace: String(column.key) === 'actions' ? 'nowrap' : 'normal',
+                      }}
+                    >
+                      {isPlainText ? (
+                        <Box
+                          component="span"
+                          title={String(value)}
+                          sx={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {value}
+                        </Box>
+                      ) : (
+                        value
+                      )}
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             ))}
           </TableBody>

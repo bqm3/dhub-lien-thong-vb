@@ -150,7 +150,7 @@ export default function CategoriesPage() {
       title="Danh mục dùng chung"
       subtitle="Quản lý danh mục: loại văn bản, độ khẩn/mật, lĩnh vực, trạng thái, hình thức gửi/nhận. CRUD tách riêng và thao tác bằng modal."
     >
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard
             label="Tổng mục"
@@ -185,7 +185,7 @@ export default function CategoriesPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12}>
           <SectionCard
             title="Danh sách danh mục"

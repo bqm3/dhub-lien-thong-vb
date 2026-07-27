@@ -12,6 +12,9 @@ const ICONS = {
   ecommerce: icon('ic_ecommerce'),
   analytics: icon('ic_analytics'),
   dashboard: icon('ic_dashboard'),
+  file: icon('ic_file'),
+  banking: icon('ic_banking'),
+  folder: icon('ic_folder'),
 };
 
 const navConfig = [
@@ -20,20 +23,8 @@ const navConfig = [
     items: [
       {
         title: 'Tổng quan hệ thống',
-        path: PATH_DASHBOARD.operations.reporting.root,
+        path: PATH_DASHBOARD.operations.reporting.executive,
         icon: ICONS.dashboard,
-        // children: [
-        //   { title: 'Tổng quan hệ thống', path: PATH_DASHBOARD.operations.reporting.executive },
-        //   { title: 'Báo cáo văn bản', path: PATH_DASHBOARD.operations.reporting.document },
-        //   { title: 'Văn bản nhận vào', path: PATH_DASHBOARD.operations.reporting.incoming },
-        //   { title: 'Theo loại văn bản', path: PATH_DASHBOARD.operations.reporting.type },
-        //   { title: 'Báo cáo giao nhận', path: PATH_DASHBOARD.operations.reporting.delivery },
-        //   { title: 'Báo cáo giao dịch lỗi', path: PATH_DASHBOARD.operations.reporting.error },
-        //   { title: 'Báo cáo gửi lại', path: PATH_DASHBOARD.operations.reporting.retry },
-        //   { title: 'Báo cáo theo đơn vị', path: PATH_DASHBOARD.operations.reporting.agency },
-        //   { title: 'Vận hành hằng ngày', path: PATH_DASHBOARD.operations.reporting.daily },
-        //   { title: 'Xuất báo cáo', path: PATH_DASHBOARD.operations.reporting.export },
-        // ],
       },
     ],
   },
@@ -53,7 +44,7 @@ const navConfig = [
       {
         title: 'Danh sach van ban',
         path: PATH_DASHBOARD.documents,
-        icon: ICONS.analytics,
+        icon: ICONS.folder,
       },
     ],
   },
@@ -72,8 +63,8 @@ const navConfig = [
     items: [
       {
         title: 'Báo cáo văn bản',
-        path: PATH_DASHBOARD.reporting.root,
-        icon: ICONS.dashboard,
+        path: PATH_DASHBOARD.operations.reporting.document,
+        icon: ICONS.file,
         children: [
           { title: 'Báo cáo văn bản', path: PATH_DASHBOARD.operations.reporting.document },
           { title: 'Văn bản nhận vào', path: PATH_DASHBOARD.operations.reporting.incoming },
@@ -83,8 +74,8 @@ const navConfig = [
       },
       {
         title: 'Báo cáo vận hành',
-        path: PATH_DASHBOARD.reporting.root,
-        icon: ICONS.dashboard,
+        path: PATH_DASHBOARD.operations.reporting.delivery,
+        icon: ICONS.analytics,
         children: [
           { title: 'Báo cáo giao nhận', path: PATH_DASHBOARD.operations.reporting.delivery },
           { title: 'Báo cáo giao dịch lỗi', path: PATH_DASHBOARD.operations.reporting.error },

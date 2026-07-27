@@ -20,7 +20,14 @@ export default function NavList({ data, depth, hasChild }: NavListRootProps) {
 
   const { pathname } = useLocation();
 
-  const { active, isExternalLink } = useActiveLink(data.path);
+  const childPaths = hasChild
+    ? (data.children || []).flatMap((child) => [
+        child.path,
+        ...(child.children || []).map((item) => item.path),
+      ])
+    : [];
+
+  const { active, isExternalLink } = useActiveLink(data.path, !hasChild, childPaths);
 
   const [open, setOpen] = useState(false);
 

@@ -165,7 +165,7 @@ export default function RolesPage() {
       title="Vai trò / Phân quyền"
       subtitle="Quản lý role-based access control: quyền tạo văn bản, trình ký, ký số, phát hành, tiếp nhận, xử lý, quản trị. CRUD bằng popup modal."
     >
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard
             label="Tổng vai trò"
@@ -200,7 +200,7 @@ export default function RolesPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12}>
           <SectionCard
             title="Danh sách vai trò"
