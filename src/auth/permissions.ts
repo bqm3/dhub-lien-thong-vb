@@ -2,6 +2,8 @@ export type PermissionCode = string;
 
 export type PermissionCheckMode = 'any' | 'all';
 
+export type DemoRole = 'ADMIN' | 'AGENCY';
+
 export const PERMISSIONS = {
   ADMIN_MANAGE: 'ADMIN_MANAGE',
   DOC_MANAGE: 'DOC_MANAGE',
@@ -9,16 +11,15 @@ export const PERMISSIONS = {
   EXCHANGE_MANAGE: 'EXCHANGE_MANAGE',
 };
 
-export const ROLE_PERMISSIONS: Record<string, PermissionCode[]> = {
+/** Chỉ 2 role: Admin hệ thống và Role đơn vị */
+export const ROLE_PERMISSIONS: Record<DemoRole, PermissionCode[]> = {
   ADMIN: [
     PERMISSIONS.ADMIN_MANAGE,
     PERMISSIONS.DOC_MANAGE,
     PERMISSIONS.WF_MANAGE,
     PERMISSIONS.EXCHANGE_MANAGE,
   ],
-  CLERK: [PERMISSIONS.DOC_MANAGE, PERMISSIONS.EXCHANGE_MANAGE],
-  LEADER: [PERMISSIONS.WF_MANAGE, PERMISSIONS.EXCHANGE_MANAGE],
-  MANAGER: [PERMISSIONS.WF_MANAGE, PERMISSIONS.EXCHANGE_MANAGE],
+  AGENCY: [PERMISSIONS.DOC_MANAGE, PERMISSIONS.EXCHANGE_MANAGE, PERMISSIONS.WF_MANAGE],
 };
 
 /** Chỉ map path đang ship trên menu / router chính */

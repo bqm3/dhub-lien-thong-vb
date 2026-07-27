@@ -27,27 +27,27 @@ const initialUsers: UserRecord[] = [
   {
     id: 'U-0001',
     fullName: 'Nguyễn Văn A',
-    username: 'nva',
-    unit: 'Văn phòng UBND',
-    role: 'Văn thư',
+    username: 'admin',
+    unit: 'Trục liên thông',
+    role: 'Admin',
     status: 'Active',
     updatedAt: '02/07/2026 09:10',
   },
   {
     id: 'U-0002',
     fullName: 'Trần Thị B',
-    username: 'ttb',
+    username: 'donvi',
     unit: 'Sở TTTT',
-    role: 'Chuyên viên',
+    role: 'Đơn vị',
     status: 'Active',
     updatedAt: '03/07/2026 13:55',
   },
   {
     id: 'U-0003',
     fullName: 'Lê Văn C',
-    username: 'lvc',
+    username: 'donvi2',
     unit: 'Sở Nội Vụ',
-    role: 'Lãnh đạo',
+    role: 'Đơn vị',
     status: 'Locked',
     updatedAt: '04/07/2026 08:02',
   },
@@ -58,7 +58,7 @@ const emptyForm: UserRecord = {
   fullName: '',
   username: '',
   unit: '',
-  role: 'Chuyên viên',
+  role: 'Đơn vị',
   status: 'Active',
   updatedAt: '',
 };
@@ -286,11 +286,8 @@ export default function UsersPage() {
                 value={formValues.role}
                 onChange={(event) => setFormValues((prev) => ({ ...prev, role: event.target.value }))}
               >
-                <MenuItem value="Văn thư">Văn thư</MenuItem>
-                <MenuItem value="Chuyên viên">Chuyên viên</MenuItem>
-                <MenuItem value="Trưởng phòng">Trưởng phòng</MenuItem>
-                <MenuItem value="Lãnh đạo">Lãnh đạo</MenuItem>
-                <MenuItem value="Quản trị">Quản trị</MenuItem>
+                <MenuItem value="Admin">Admin</MenuItem>
+                <MenuItem value="Đơn vị">Đơn vị</MenuItem>
               </TextField>
             </Grid>
             <Grid item xs={12} md={6}>

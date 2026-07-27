@@ -4,7 +4,7 @@ import axios from '../utils/axios';
 //
 import { isValidToken, setSession } from './utils';
 import { ActionMapType, AuthStateType, AuthUserType, JWTContextType } from './types';
-import { ROLE_PERMISSIONS } from './permissions';
+import { DemoRole, ROLE_PERMISSIONS } from './permissions';
 
 // ----------------------------------------------------------------------
 
@@ -90,11 +90,11 @@ type AuthProviderProps = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const buildDemoUser = (args?: { role?: 'ADMIN' | 'MANAGER' | 'CLERK' | 'LEADER'; agencyCode?: string; email?: string; name?: string }) => {
+  const buildDemoUser = (args?: { role?: DemoRole; agencyCode?: string; email?: string; name?: string }) => {
     const role = args?.role ?? 'ADMIN';
     const email = args?.email ?? 'admin@local';
     const name = args?.name ?? 'System Admin';
-    const agencyCode = args?.agencyCode ?? (role === 'CLERK' ? 'SO_THONG_TIN' : 'SO_NOI_VU');
+    const agencyCode = args?.agencyCode ?? (role === 'AGENCY' ? 'SO_THONG_TIN' : 'SO_NOI_VU');
 
     const permissions = ROLE_PERMISSIONS[role] || [];
 
@@ -168,25 +168,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Fake accounts for UI + permissions testing (until BE is ready)
     if (normalizedEmail === 'admin@local' && password === 'admin123') {
       // ok
-    } else if (normalizedEmail === 'manager@local' && password === 'manager123') {
-      // ok
-    } else if (normalizedEmail === 'vanthu@local' && password === 'vanthu123') {
-      // ok
-    } else if (normalizedEmail === 'lanhdao@local' && password === 'lanhdao123') {
+    } else if (normalizedEmail === 'donvi@local' && password === 'donvi123') {
       // ok
     } else {
-      throw new Error('Sai tài khoản/mật khẩu demo. Dùng admin@local/admin123, vanthu@local/vanthu123 hoặc lanhdao@local/lanhdao123');
+      throw new Error('Sai tài khoản/mật khẩu demo. Dùng admin@local/admin123 hoặc donvi@local/donvi123');
     }
 
     let user;
     if (normalizedEmail === 'admin@local') {
       user = buildDemoUser({ role: 'ADMIN', email: 'admin@local', name: 'Quản trị hệ thống' });
-    } else if (normalizedEmail === 'vanthu@local') {
-      user = buildDemoUser({ role: 'CLERK', email: 'vanthu@local', name: 'Văn thư cơ quan', agencyCode: 'SO_THONG_TIN' });
-    } else if (normalizedEmail === 'lanhdao@local') {
-      user = buildDemoUser({ role: 'LEADER', email: 'lanhdao@local', name: 'Lãnh đạo đơn vị' });
     } else {
-      user = buildDemoUser({ role: 'LEADER', email: 'manager@local', name: 'Lãnh đạo đơn vị' });
+      user = buildDemoUser({
+        role: 'AGENCY',
+        email: 'donvi@local',
+        name: 'Cán bộ đơn vị',
+        agencyCode: 'SO_THONG_TIN',
+      });
     }
 
     // JWT demo: header.payload.signature — exp = year 2099 (4070908800)
