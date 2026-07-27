@@ -13,7 +13,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { DataTable, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
+import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
 
 type RoleRecord = {
   code: string;
@@ -157,44 +157,34 @@ export default function RolesPage() {
       title="Vai trò / Phân quyền"
       subtitle="Quản lý 2 vai trò: Admin (hệ thống) và Đơn vị. CRUD bằng popup modal."
     >
-      <Grid container>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Tổng vai trò"
-            value={rows.length}
-            helper="Dữ liệu demo (local state)"
-            icon="solar:user-id-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Đang active"
-            value={rows.filter((r) => r.status === 'Active').length}
-            helper="Gán cho người dùng/đơn vị"
-            icon="solar:shield-check-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Quyền (catalog)"
-            value={permissionCatalog.length}
-            helper="Danh sách permission mẫu"
-            icon="solar:list-check-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Scope"
-            value={new Set(rows.map((r) => r.scope)).size}
-            helper="Hệ thống / Đơn vị"
-            icon="solar:hierarchy-2-bold"
-          />
-        </Grid>
-      </Grid>
+      <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
+        <MetricCard
+          label="Tổng vai trò"
+          value={rows.length}
+          helper="Dữ liệu demo (local state)"
+          icon="solar:user-id-bold"
+        />
+        <MetricCard
+          label="Đang active"
+          value={rows.filter((r) => r.status === 'Active').length}
+          helper="Gán cho người dùng/đơn vị"
+          icon="solar:shield-check-bold"
+        />
+        <MetricCard
+          label="Quyền (catalog)"
+          value={permissionCatalog.length}
+          helper="Danh sách permission mẫu"
+          icon="solar:list-check-bold"
+        />
+        <MetricCard
+          label="Scope"
+          value={new Set(rows.map((r) => r.scope)).size}
+          helper="Hệ thống / Đơn vị"
+          icon="solar:hierarchy-2-bold"
+        />
+      </GridRow>
 
-      <Grid container>
-        <Grid item xs={12}>
-          <SectionCard
+      <SectionCard
             title="Danh sách vai trò"
             subtitle="Tách riêng giao diện role/permission; thêm/sửa/xóa bằng modal."
             action={
@@ -228,8 +218,6 @@ export default function RolesPage() {
               </Box>
             </Stack>
           </SectionCard>
-        </Grid>
-      </Grid>
 
       <Dialog open={openEditor} onClose={() => setOpenEditor(false)} fullWidth maxWidth="md">
         <DialogTitle>{editingCode ? 'Cập nhật vai trò' : 'Tạo mới vai trò'}</DialogTitle>

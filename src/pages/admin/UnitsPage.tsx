@@ -11,7 +11,7 @@ import {
   Stack,
   TextField,
 } from '@mui/material';
-import { DataTable, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
+import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
 
 type UnitRecord = {
   code: string;
@@ -144,44 +144,34 @@ export default function UnitsPage() {
       title="Đơn vị"
       subtitle="Quản lý tổ chức/đơn vị: cơ quan gửi/nhận, mã định danh đơn vị, sơ đồ tổ chức. CRUD rõ ràng với popup modal."
     >
-      <Grid container>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Tổng đơn vị"
-            value={rows.length}
-            helper="Dữ liệu demo (local state)"
-            icon="solar:buildings-2-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Đang hoạt động"
-            value={rows.filter((u) => u.status === 'Active').length}
-            helper="Kết nối liên thông theo đơn vị"
-            icon="solar:shield-check-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Ngưng hoạt động"
-            value={rows.filter((u) => u.status === 'Inactive').length}
-            helper="Khóa trao đổi/đồng bộ"
-            icon="solar:shield-warning-bold"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard
-            label="Cấp tổ chức"
-            value={new Set(rows.map((u) => u.level)).size}
-            helper="Bộ/Tỉnh/Sở/..."
-            icon="solar:hierarchy-2-bold"
-          />
-        </Grid>
-      </Grid>
+      <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
+        <MetricCard
+          label="Tổng đơn vị"
+          value={rows.length}
+          helper="Dữ liệu demo (local state)"
+          icon="solar:buildings-2-bold"
+        />
+        <MetricCard
+          label="Đang hoạt động"
+          value={rows.filter((u) => u.status === 'Active').length}
+          helper="Kết nối liên thông theo đơn vị"
+          icon="solar:shield-check-bold"
+        />
+        <MetricCard
+          label="Ngưng hoạt động"
+          value={rows.filter((u) => u.status === 'Inactive').length}
+          helper="Khóa trao đổi/đồng bộ"
+          icon="solar:shield-warning-bold"
+        />
+        <MetricCard
+          label="Cấp tổ chức"
+          value={new Set(rows.map((u) => u.level)).size}
+          helper="Bộ/Tỉnh/Sở/..."
+          icon="solar:hierarchy-2-bold"
+        />
+      </GridRow>
 
-      <Grid container>
-        <Grid item xs={12}>
-          <SectionCard
+      <SectionCard
             title="Danh sách đơn vị"
             subtitle="Danh sách được tách riêng theo giao diện; thêm/sửa/xóa bằng modal."
             action={
@@ -216,8 +206,6 @@ export default function UnitsPage() {
               </Box>
             </Stack>
           </SectionCard>
-        </Grid>
-      </Grid>
 
       <Dialog open={openEditor} onClose={() => setOpenEditor(false)} fullWidth maxWidth="md">
         <DialogTitle>{editingCode ? 'Cập nhật đơn vị' : 'Tạo mới đơn vị'}</DialogTitle>

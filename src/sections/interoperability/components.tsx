@@ -56,6 +56,35 @@ type DataTableProps<T extends Record<string, ReactNode>> = {
   maxHeight?: number | string;
 };
 
+/** Responsive grid row dùng CSS grid — không có margin âm như MUI Grid container spacing */
+export function GridRow({
+  children,
+  cols = { xs: 1, sm: 2, md: 2, lg: 4 },
+  spacing = 3,
+}: {
+  children: ReactNode;
+  cols?: { xs?: number; sm?: number; md?: number; lg?: number };
+  spacing?: number;
+}) {
+  const gap = spacing * 8;
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gap: `${gap}px`,
+        gridTemplateColumns: {
+          xs: `repeat(${cols.xs ?? 1}, 1fr)`,
+          sm: `repeat(${cols.sm ?? 2}, 1fr)`,
+          md: `repeat(${cols.md ?? 2}, 1fr)`,
+          lg: `repeat(${cols.lg ?? 4}, 1fr)`,
+        },
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
 export function PageShell({ title, subtitle, children }: ShellProps) {
   const { themeStretch } = useSettingsContext();
 
