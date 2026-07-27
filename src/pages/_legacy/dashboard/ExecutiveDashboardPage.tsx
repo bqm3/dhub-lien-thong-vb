@@ -106,7 +106,7 @@ export default function ExecutiveDashboardPage() {
           : 'Bảng điều khiển theo phạm vi đơn vị: theo dõi văn bản, giao dịch và trạng thái liên thông của đơn vị bạn.'
       }
     >
-      <Grid container spacing={3}>
+      <Grid container>
         {overviewMetrics.map((metric, index) => (
           <Grid key={metric.label} item xs={12} sm={6} lg={4}>
             <MetricCard
@@ -126,7 +126,7 @@ export default function ExecutiveDashboardPage() {
         ))}
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} lg={8}>
           <SectionCard
             title="Xu hướng 7 ngày"
@@ -175,7 +175,7 @@ export default function ExecutiveDashboardPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} lg={5}>
           <SectionCard title="SLA theo đơn vị" subtitle="Success rate mẫu theo đơn vị trong phạm vi xem">
             <Box sx={{ height: 280 }}>

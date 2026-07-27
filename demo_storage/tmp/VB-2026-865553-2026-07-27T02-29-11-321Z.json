@@ -1,0 +1,17 @@
+{
+  "code": "VB-2026-865553",
+  "title": "test",
+  "type": "CONG_VAN",
+  "sender": "test",
+  "receiver": "test",
+  "version": "v1",
+  "classification": "Thường",
+  "status": "Chờ ký số",
+  "createdAt": "16:17:45 22/07/2026",
+  "attachments": [
+    "1_001_C26TTN_12304_29178.pdf"
+  ],
+  "signProvider": "USB Token / HSM",
+  "signStatus": "Đã ký số",
+  "signedPositions": 2
+}

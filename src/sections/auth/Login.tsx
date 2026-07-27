@@ -36,9 +36,8 @@ export default function Login() {
 
       <Alert severity="info" sx={{ mb: 3 }}>
         <Stack spacing={0.5}>
-          <div><strong>1. Quản trị:</strong> admin@local / admin123</div>
-          <div><strong>2. Văn thư:</strong> vanthu@local / vanthu123</div>
-          <div><strong>3. Lãnh đạo:</strong> lanhdao@local / lanhdao123</div>
+          <div><strong>1. Admin:</strong> admin@local / admin123</div>
+          <div><strong>2. Đơn vị:</strong> donvi@local / donvi123</div>
         </Stack>
       </Alert>
 

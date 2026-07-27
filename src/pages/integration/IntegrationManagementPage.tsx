@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   Box,
   Button,
@@ -6,6 +6,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   Grid,
   MenuItem,
   Stack,
@@ -49,6 +50,8 @@ export default function IntegrationManagementPage() {
   const [keyword, setKeyword] = useState('');
   const [tab, setTab] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
+  const [detailAgency, setDetailAgency] = useState<AgencyConnection | null>(null);
+  const [detailTab, setDetailTab] = useState(0);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<AgencyConnection>(emptyAgencyForm);
 
@@ -76,7 +79,7 @@ export default function IntegrationManagementPage() {
     registeredAt: `01/0${Math.floor(Math.random() * 6) + 1}/2026`,
     actions: (
       <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <Button size="small" onClick={() => handleEdit(a)}>Sửa</Button>
+        <Button size="small" variant="outlined" onClick={() => handleOpenDetail(a)}>Sửa</Button>
         <Button size="small" color="error" onClick={() => handleDelete(a.code)}>Xóa</Button>
       </Stack>
     ),
@@ -143,30 +146,48 @@ export default function IntegrationManagementPage() {
     setEditingCode(null);
     setFormValues({
       ...emptyAgencyForm,
-      clientId: `cli_new_2026_${String(agencyList.length + 1).padStart(3, '0')}`,
+      clientId: `cli_new_2026_${String(agencyList.length + 1).length < 3 ? `00${agencyList.length + 1}`.slice(-3) : String(agencyList.length + 1)}`,
       apiKey: `ak_${Math.random().toString(36).slice(2, 6).toUpperCase()}***`,
     });
     setOpenDialog(true);
   }
 
-  function handleEdit(agency: AgencyConnection) {
-    setEditingCode(agency.code);
+  function handleOpenDetail(agency: AgencyConnection) {
+    setDetailAgency(agency);
     setFormValues(agency);
-    setOpenDialog(true);
+    setEditingCode(agency.code);
+    setDetailTab(0);
   }
 
   function handleDelete(code: string) {
     setAgencyList((prev) => prev.filter((a) => a.code !== code));
+    if (detailAgency?.code === code) setDetailAgency(null);
   }
 
   function handleSubmit() {
     if (!formValues.code || !formValues.name || !formValues.endpoint) return;
     if (editingCode) {
       setAgencyList((prev) => prev.map((a) => (a.code === editingCode ? formValues : a)));
+      setDetailAgency(formValues);
     } else {
       setAgencyList((prev) => [formValues, ...prev]);
     }
     setOpenDialog(false);
+  }
+
+  function handleSaveDetail() {
+    if (!formValues.code || !formValues.name || !formValues.endpoint || !detailAgency) return;
+    setAgencyList((prev) => prev.map((a) => (a.code === detailAgency.code ? formValues : a)));
+    setDetailAgency(formValues);
+  }
+
+  function DetailField({ label, value }: { label: string; value: ReactNode }) {
+    return (
+      <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral', height: '100%' }}>
+        <Typography variant="caption" color="text.secondary">{label}</Typography>
+        <Typography variant="subtitle2" sx={{ wordBreak: 'break-all' }}>{value}</Typography>
+      </Box>
+    );
   }
 
   const tabConfig = [
@@ -183,7 +204,7 @@ export default function IntegrationManagementPage() {
       subtitle="Quản lý các đơn vị tham gia trục liên thông: đăng ký, cấp Client ID, API Key, cấu hình Endpoint và quản lý Credential."
     >
       {/* Metrics */}
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard
             label="Đơn vị đã đăng ký"
@@ -219,7 +240,7 @@ export default function IntegrationManagementPage() {
       </Grid>
 
       {/* Summary cards */}
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} md={4}>
           <SectionCard title="Cơ cấu đơn vị" subtitle="Phân loại theo cấp hành chính.">
             <Stack spacing={1.5}>
@@ -278,11 +299,11 @@ export default function IntegrationManagementPage() {
       <SectionCard
         title="Quản lý kết nối"
         subtitle="Chọn nhóm chức năng để xem và thao tác."
-        action={
-          <Button variant="contained" startIcon={<Iconify icon="solar:user-plus-bold" />} onClick={handleOpenCreate}>
-            Thêm đơn vị
-          </Button>
-        }
+        // action={
+        //   <Button variant="contained" startIcon={<Iconify icon="solar:user-plus-bold" />} onClick={handleOpenCreate}>
+        //     Thêm đơn vị
+        //   </Button>
+        // }
       >
         <Stack spacing={2}>
           <TextField
@@ -370,12 +391,12 @@ export default function IntegrationManagementPage() {
         </Stack>
       </SectionCard>
 
-      {/* Dialog thêm/sửa */}
+      {/* Dialog thêm đơn vị */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editingCode ? 'Cập nhật đơn vị kết nối' : 'Đăng ký đơn vị kết nối'}</DialogTitle>
+        <DialogTitle>Đăng ký đơn vị kết nối</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Mã đơn vị" value={formValues.code} disabled={Boolean(editingCode)}
+            <TextField label="Mã đơn vị" value={formValues.code}
               onChange={(e) => setFormValues((p) => ({ ...p, code: e.target.value }))} />
             <TextField label="Tên đơn vị" value={formValues.name}
               onChange={(e) => setFormValues((p) => ({ ...p, name: e.target.value }))} />
@@ -402,6 +423,194 @@ export default function IntegrationManagementPage() {
           <Button variant="contained" onClick={handleSubmit}>Lưu</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Dialog chi tiết / sửa đơn vị */}
+      <Dialog open={Boolean(detailAgency)} onClose={() => setDetailAgency(null)} fullWidth maxWidth="md">
+        {detailAgency && (
+          <>
+            <DialogTitle>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                <Box>
+                  <Typography variant="h6">{formValues.name || detailAgency.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">{formValues.code || detailAgency.code}</Typography>
+                </Box>
+                <StatusChip status={formValues.status} />
+              </Stack>
+            </DialogTitle>
+            <Divider />
+            <DialogContent sx={{ pt: 1 }}>
+              <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
+                <Tab label="Tổng quan" />
+                <Tab label="Client ID" />
+                <Tab label="API Key" />
+                <Tab label="Endpoint" />
+                <Tab label="Credential" />
+                <Tab label="Chỉnh sửa" />
+              </Tabs>
+
+              {detailTab === 0 && (
+                <Grid container spacing={2}>
+                  {[
+                    { label: 'Mã đơn vị', value: formValues.code },
+                    { label: 'Tên đơn vị', value: formValues.name },
+                    { label: 'Cấp', value: formValues.level || '—' },
+                    { label: 'Trạng thái', value: formValues.status },
+                    { label: 'Client ID', value: formValues.clientId },
+                    { label: 'API Key', value: formValues.apiKey },
+                    { label: 'Endpoint', value: formValues.endpoint },
+                    { label: 'Loại Credential', value: formValues.credentialType || '—' },
+                    { label: 'Success Rate', value: `${formValues.successRate}%` },
+                    { label: 'Avg Latency', value: formValues.avgLatency },
+                  ].map((row) => (
+                    <Grid key={row.label} item xs={12} sm={6}>
+                      <DetailField label={row.label} value={row.value} />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+
+              {detailTab === 1 && (
+                <Stack spacing={2}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}><DetailField label="Client ID" value={formValues.clientId} /></Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Ngày cấp" value="01/01/2026" /></Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Hết hạn" value="31/12/2026" /></Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Trạng thái" value={<StatusChip status={formValues.status} />} /></Grid>
+                  </Grid>
+                  <AlertInfo text="Client ID duy nhất theo agencyCode. Không cấp trùng; dùng để xác thực OAuth/JWT khi gọi API liên thông." />
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="outlined"
+                      onClick={() =>
+                        setFormValues((p) => ({
+                          ...p,
+                          clientId: `cli_${p.code.toLowerCase()}_${Date.now().toString().slice(-4)}`,
+                        }))
+                      }
+                    >
+                      Cấp lại Client ID
+                    </Button>
+                  </Stack>
+                </Stack>
+              )}
+
+              {detailTab === 2 && (
+                <Stack spacing={2}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}><DetailField label="API Key" value={formValues.apiKey} /></Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Loại Credential" value={formValues.credentialType || '—'} /></Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Rotate lần cuối" value="15/06/2026" /></Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Trạng thái" value={<StatusChip status={formValues.status} />} /></Grid>
+                  </Grid>
+                  <AlertInfo text="API Key chỉ hiển thị một phần trên UI. Rotate định kỳ; revoke ngay khi nghi ngờ lộ khóa." />
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="outlined"
+                      onClick={() =>
+                        setFormValues((p) => ({
+                          ...p,
+                          apiKey: `ak_${Math.random().toString(36).slice(2, 6).toUpperCase()}***`,
+                        }))
+                      }
+                    >
+                      Rotate API Key
+                    </Button>
+                    <Button variant="outlined" color="warning" onClick={() => setFormValues((p) => ({ ...p, status: 'warning' }))}>
+                      Revoke
+                    </Button>
+                  </Stack>
+                </Stack>
+              )}
+
+              {detailTab === 3 && (
+                <Stack spacing={2}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}><DetailField label="Endpoint URL" value={formValues.endpoint} /></Grid>
+                    <Grid item xs={12} sm={4}><DetailField label="Success Rate" value={`${formValues.successRate}%`} /></Grid>
+                    <Grid item xs={12} sm={4}><DetailField label="Avg Latency" value={formValues.avgLatency} /></Grid>
+                    <Grid item xs={12} sm={4}><DetailField label="Kiểm tra lần cuối" value="02/07/2026 08:00" /></Grid>
+                  </Grid>
+                  <AlertInfo text="Endpoint dùng để nhận văn bản / webhook ACK-Status. Health check định kỳ mỗi 5 phút." />
+                  <Button variant="outlined" sx={{ alignSelf: 'flex-start' }}>Test ping</Button>
+                </Stack>
+              )}
+
+              {detailTab === 4 && (
+                <Stack spacing={2}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}><DetailField label="Loại Credential" value={formValues.credentialType || '—'} /></Grid>
+                    <Grid item xs={12} sm={6}>
+                      <DetailField
+                        label="Cert Fingerprint"
+                        value={`SHA256:${(formValues.clientId || 'XXXXXXXX').slice(-8).toUpperCase()}`}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Hiệu lực đến" value="31/12/2026" /></Grid>
+                    <Grid item xs={12} sm={6}><DetailField label="Trạng thái" value={<StatusChip status={formValues.status} />} /></Grid>
+                  </Grid>
+                  <AlertInfo text="Hỗ trợ OAuth2, mTLS và chữ ký số. Cảnh báo trước 14 ngày khi certificate/key sắp hết hạn." />
+                  <Stack direction="row" spacing={1}>
+                    <Button variant="outlined">Gia hạn</Button>
+                    <Button variant="outlined" color="error" onClick={() => setFormValues((p) => ({ ...p, status: 'warning' }))}>
+                      Thu hồi
+                    </Button>
+                  </Stack>
+                </Stack>
+              )}
+
+              {detailTab === 5 && (
+                <Stack spacing={2}>
+                  <TextField label="Mã đơn vị" value={formValues.code} disabled />
+                  <TextField label="Tên đơn vị" value={formValues.name}
+                    onChange={(e) => setFormValues((p) => ({ ...p, name: e.target.value }))} />
+                  <TextField label="Cấp đơn vị" select value={formValues.level}
+                    onChange={(e) => setFormValues((p) => ({ ...p, level: e.target.value }))}>
+                    {LEVELS.map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+                  </TextField>
+                  <TextField label="Client ID" value={formValues.clientId}
+                    onChange={(e) => setFormValues((p) => ({ ...p, clientId: e.target.value }))} />
+                  <TextField label="API Key" value={formValues.apiKey}
+                    onChange={(e) => setFormValues((p) => ({ ...p, apiKey: e.target.value }))} />
+                  <TextField label="Endpoint URL" value={formValues.endpoint}
+                    onChange={(e) => setFormValues((p) => ({ ...p, endpoint: e.target.value }))} />
+                  <TextField label="Loại Credential" select value={formValues.credentialType}
+                    onChange={(e) => setFormValues((p) => ({ ...p, credentialType: e.target.value }))}>
+                    {CREDENTIAL_TYPES.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                  </TextField>
+                  <TextField label="Trạng thái" select value={formValues.status}
+                    onChange={(e) => setFormValues((p) => ({ ...p, status: e.target.value as AgencyConnection['status'] }))}>
+                    <MenuItem value="active">Active</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="warning">Warning</MenuItem>
+                  </TextField>
+                  <TextField
+                    label="Success Rate (%)"
+                    type="number"
+                    value={formValues.successRate}
+                    onChange={(e) => setFormValues((p) => ({ ...p, successRate: Number(e.target.value) || 0 }))}
+                  />
+                  <TextField label="Avg Latency" value={formValues.avgLatency}
+                    onChange={(e) => setFormValues((p) => ({ ...p, avgLatency: e.target.value }))} />
+                </Stack>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDetailAgency(null)}>Đóng</Button>
+              {(detailTab === 5 || detailTab === 1 || detailTab === 2) && (
+                <Button variant="contained" onClick={handleSaveDetail}>Lưu thay đổi</Button>
+              )}
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </PageShell>
+  );
+}
+
+function AlertInfo({ text }: { text: string }) {
+  return (
+    <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
+      <Typography variant="body2" color="text.secondary">{text}</Typography>
+    </Box>
   );
 }

@@ -12,6 +12,8 @@ const ICONS = {
   ecommerce: icon('ic_ecommerce'),
   analytics: icon('ic_analytics'),
   dashboard: icon('ic_dashboard'),
+  file: icon('ic_file'),
+  folder: icon('ic_folder'),
 };
 
 const navConfig = [
@@ -20,49 +22,37 @@ const navConfig = [
     items: [
       {
         title: 'Tổng quan hệ thống',
-        path: PATH_DASHBOARD.operations.reporting.root,
+        path: PATH_DASHBOARD.reporting.executive,
         icon: ICONS.dashboard,
-        // children: [
-        //   { title: 'Tổng quan hệ thống', path: PATH_DASHBOARD.operations.reporting.executive },
-        //   { title: 'Báo cáo văn bản', path: PATH_DASHBOARD.operations.reporting.document },
-        //   { title: 'Văn bản nhận vào', path: PATH_DASHBOARD.operations.reporting.incoming },
-        //   { title: 'Theo loại văn bản', path: PATH_DASHBOARD.operations.reporting.type },
-        //   { title: 'Báo cáo giao nhận', path: PATH_DASHBOARD.operations.reporting.delivery },
-        //   { title: 'Báo cáo giao dịch lỗi', path: PATH_DASHBOARD.operations.reporting.error },
-        //   { title: 'Báo cáo gửi lại', path: PATH_DASHBOARD.operations.reporting.retry },
-        //   { title: 'Báo cáo theo đơn vị', path: PATH_DASHBOARD.operations.reporting.agency },
-        //   { title: 'Vận hành hằng ngày', path: PATH_DASHBOARD.operations.reporting.daily },
-        //   { title: 'Xuất báo cáo', path: PATH_DASHBOARD.operations.reporting.export },
-        // ],
       },
     ],
   },
   {
-    subheader: 'ket noi lien thong',
+    subheader: 'Kết nối liên thông',
     items: [
       {
-        title: 'Ket noi lien thong',
+        title: 'Kết nối liên thông',
         path: PATH_DASHBOARD.integration,
         icon: ICONS.ecommerce,
       },
     ],
   },
   {
-    subheader: 'quan ly van ban',
+    subheader: 'Quản lý văn bản',
     items: [
       {
-        title: 'Danh sach van ban',
+        title: 'Danh sách văn bản',
         path: PATH_DASHBOARD.documents,
-        icon: ICONS.analytics,
+        icon: ICONS.folder,
       },
     ],
   },
   {
-    subheader: 'trao doi van ban',
+    subheader: 'Trao đổi văn bản',
     items: [
       {
-        title: 'Trao doi van ban',
-        path: PATH_DASHBOARD.operations.exchange,
+        title: 'Trao đổi văn bản',
+        path: PATH_DASHBOARD.exchange,
         icon: ICONS.ecommerce,
       },
     ],
@@ -72,41 +62,41 @@ const navConfig = [
     items: [
       {
         title: 'Báo cáo văn bản',
-        path: PATH_DASHBOARD.reporting.root,
-        icon: ICONS.dashboard,
+        path: PATH_DASHBOARD.reporting.document,
+        icon: ICONS.file,
         children: [
-          { title: 'Báo cáo văn bản', path: PATH_DASHBOARD.operations.reporting.document },
-          { title: 'Văn bản nhận vào', path: PATH_DASHBOARD.operations.reporting.incoming },
-          { title: 'Theo loại văn bản', path: PATH_DASHBOARD.operations.reporting.type },
-          { title: 'Báo cáo theo đơn vị', path: PATH_DASHBOARD.operations.reporting.agency },
+          { title: 'Báo cáo văn bản', path: PATH_DASHBOARD.reporting.document },
+          { title: 'Văn bản nhận vào', path: PATH_DASHBOARD.reporting.incoming },
+          { title: 'Theo loại văn bản', path: PATH_DASHBOARD.reporting.type },
+          { title: 'Báo cáo theo đơn vị', path: PATH_DASHBOARD.reporting.agency },
         ],
       },
       {
         title: 'Báo cáo vận hành',
-        path: PATH_DASHBOARD.reporting.root,
-        icon: ICONS.dashboard,
+        path: PATH_DASHBOARD.reporting.delivery,
+        icon: ICONS.analytics,
         children: [
-          { title: 'Báo cáo giao nhận', path: PATH_DASHBOARD.operations.reporting.delivery },
-          { title: 'Báo cáo giao dịch lỗi', path: PATH_DASHBOARD.operations.reporting.error },
-          { title: 'Báo cáo gửi lại', path: PATH_DASHBOARD.operations.reporting.retry },
-          { title: 'Vận hành hằng ngày', path: PATH_DASHBOARD.operations.reporting.daily },
-          { title: 'Xuất báo cáo', path: PATH_DASHBOARD.operations.reporting.export },
+          { title: 'Báo cáo giao nhận', path: PATH_DASHBOARD.reporting.delivery },
+          { title: 'Báo cáo giao dịch lỗi', path: PATH_DASHBOARD.reporting.error },
+          { title: 'Báo cáo gửi lại', path: PATH_DASHBOARD.reporting.retry },
+          { title: 'Vận hành hằng ngày', path: PATH_DASHBOARD.reporting.daily },
+          { title: 'Xuất báo cáo', path: PATH_DASHBOARD.reporting.export },
         ],
       },
     ],
   },
   {
-    subheader: 'quan tri he thong',
+    subheader: 'Quản trị hệ thống',
     items: [
       {
-        title: 'Quan tri nen tang',
+        title: 'Quản trị nền tảng',
         path: PATH_DASHBOARD.admin.root,
         icon: ICONS.user,
         children: [
-          { title: 'Nguoi dung', path: PATH_DASHBOARD.admin.users },
-          { title: 'Don vi', path: PATH_DASHBOARD.admin.units },
-          { title: 'Vai tro / phan quyen', path: PATH_DASHBOARD.admin.roles },
-          { title: 'Danh muc dung chung', path: PATH_DASHBOARD.admin.categories },
+          { title: 'Người dùng', path: PATH_DASHBOARD.admin.users },
+          { title: 'Đơn vị', path: PATH_DASHBOARD.admin.units },
+          { title: 'Vai trò / phân quyền', path: PATH_DASHBOARD.admin.roles },
+          { title: 'Danh mục dùng chung', path: PATH_DASHBOARD.admin.categories },
         ],
       },
     ],

@@ -19,7 +19,16 @@ type NavListRootProps = {
 export default function NavList({ data, depth, hasChild }: NavListRootProps) {
   const { pathname } = useLocation();
 
-  const { active, isExternalLink } = useActiveLink(data.path);
+  const childPaths = hasChild
+    ? (data.children || []).flatMap((child) => [
+        child.path,
+        ...(child.children || []).map((item) => item.path),
+      ])
+    : [];
+
+  // Parent groups should only light up when one of their children is active,
+  // not when the shared reporting root matches every report page.
+  const { active, isExternalLink } = useActiveLink(data.path, !hasChild, childPaths);
 
   const [open, setOpen] = useState(active);
 

@@ -117,7 +117,7 @@ export const documentLifecycle = [
   'Xử lý',
   'Lưu trữ',
   'Tra cứu',
-  'Archive/Hủy',
+  'Lưu trữ dài hạn / Hủy',
 ];
 
 export const reportCatalog = [

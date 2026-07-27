@@ -34,20 +34,12 @@ const initialRoles: RoleRecord[] = [
     updatedAt: '25/06/2026 08:00',
   },
   {
-    code: 'VAN_THU',
-    name: 'Văn thư',
+    code: 'AGENCY',
+    name: 'Đơn vị',
     scope: 'Đơn vị',
     status: 'Active',
-    permissions: ['DOC_MANAGE', 'EXCHANGE_MANAGE'],
+    permissions: ['DOC_MANAGE', 'WF_MANAGE', 'EXCHANGE_MANAGE'],
     updatedAt: '28/06/2026 10:15',
-  },
-  {
-    code: 'LANH_DAO',
-    name: 'Lãnh đạo',
-    scope: 'Đơn vị',
-    status: 'Active', // Let's make it active so the demo looks nice
-    permissions: ['WF_MANAGE', 'EXCHANGE_MANAGE'],
-    updatedAt: '02/07/2026 15:22',
   },
 ];
 
@@ -163,9 +155,9 @@ export default function RolesPage() {
   return (
     <PageShell
       title="Vai trò / Phân quyền"
-      subtitle="Quản lý role-based access control: quyền tạo văn bản, trình ký, ký số, phát hành, tiếp nhận, xử lý, quản trị. CRUD bằng popup modal."
+      subtitle="Quản lý 2 vai trò: Admin (hệ thống) và Đơn vị. CRUD bằng popup modal."
     >
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard
             label="Tổng vai trò"
@@ -200,7 +192,7 @@ export default function RolesPage() {
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container>
         <Grid item xs={12}>
           <SectionCard
             title="Danh sách vai trò"

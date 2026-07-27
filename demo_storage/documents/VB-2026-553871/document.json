@@ -1,0 +1,18 @@
+{
+  "code": "VB-2026-553871",
+  "title": "test",
+  "type": "CONG_VAN",
+  "sender": "test",
+  "receiver": "test",
+  "version": "v1",
+  "classification": "Thường",
+  "status": "Đang xử lý",
+  "createdAt": "09:32:33 27/07/2026",
+  "attachments": [
+    "961538ba_hop-dong_signed.pdf",
+    "1_001_C26TTN_12304_29178_sign.pdf"
+  ],
+  "signProvider": "USB Token / HSM",
+  "signStatus": "Chưa ký",
+  "signedPositions": 0
+}
