@@ -233,7 +233,7 @@ export default function IntegrationManagementPage() {
       </GridRow>
 
       {/* Summary cards */}
-      <GridRow cols={{ xs: 1, md: 3 }}>
+      {/* <GridRow cols={{ xs: 1, md: 3 }}>
         <Box>
           <SectionCard title="Cơ cấu đơn vị" subtitle="Phân loại theo cấp hành chính.">
             <Stack spacing={1.5}>
@@ -286,7 +286,7 @@ export default function IntegrationManagementPage() {
             </Stack>
           </SectionCard>
         </Box>
-      </GridRow>
+      </GridRow> */}
 
       {/* Main tabs */}
       <SectionCard
