@@ -1,20 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useSnackbar } from 'notistack';
 import {
   Alert,
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Grid,
   IconButton,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
-import { documentLifecycle, documents } from '../../sections/interoperability/mockData';
+import {
+  DocumentRecord,
+  documentLifecycle,
+  documents,
+} from '../../sections/interoperability/mockData';
 import {
   DataTable,
   GridRow,
@@ -209,82 +221,52 @@ function fakeAudit(doc: ManagedDocumentRecord) {
 }
 
 export default function DocumentManagementPage() {
-  const defaultDates = useMemo(() => getDefaultDateRange(), []);
-  const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
-  const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
-
-  const [unitOptions, setUnitOptions] = useState<UnitOption[]>(defaultUnits);
-  const [selectedReceivers, setSelectedReceivers] = useState<UnitOption[]>([defaultUnits[4]]);
-
-  const [documentList, setDocumentList] = useState<ManagedDocumentRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [documentList, setDocumentList] = useState<ManagedDocumentRecord[]>(initialDocuments);
   const [keyword, setKeyword] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [openForm, setOpenForm] = useState(false);
+  const [openSignDialog, setOpenSignDialog] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ManagedDocumentRecord>(emptyDocumentForm);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [formAttachmentPreviewUrls, setFormAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [detailDoc, setDetailDoc] = useState<ManagedDocumentRecord | null>(null);
-  const [previewDoc, setPreviewDoc] = useState<ManagedDocumentRecord | null>(null);
+  const [detailTab, setDetailTab] = useState(0);
+  const [lifecycleExpanded, setLifecycleExpanded] = useState(false);
   const { enqueueSnackbar } = useSnackbar();
 
-  // Fetch Units catalog (PARENT_CODE = DON_VI)
   useEffect(() => {
-    async function fetchUnits() {
+    let mounted = true;
+
+    async function loadSavedDocuments() {
       try {
-        const res = await dmCategoryApi.getList({ searchField: { PARENT_CODE: 'DON_VI' } });
-        if (res.data && res.data.length > 0) {
-          const mapped = res.data.map((u) => ({ code: u.code, name: u.name }));
-          setUnitOptions(mapped);
-          if (mapped.length > 1) {
-            setSelectedReceivers([mapped[1]]);
-            setFormValues((p) => ({ ...p, sender: mapped[0].code, receiver: mapped[1].code }));
-          }
-        }
-      } catch (e) {
-        console.warn('Unable to load units from API, using defaults', e);
+        const resp = await fetch('/api/demo-documents');
+        if (!resp.ok) return;
+        const payload = await resp.json();
+        const savedDocsRaw = Array.isArray(payload?.documents) ? payload.documents : [];
+        const savedDocs: ManagedDocumentRecord[] = savedDocsRaw
+          .map((item: Partial<ManagedDocumentRecord>) => normalizeManagedDocument(item))
+          .filter((item: ManagedDocumentRecord | null): item is ManagedDocumentRecord => Boolean(item));
+
+        if (!mounted || savedDocs.length === 0) return;
+
+        setDocumentList((prev) => {
+          const byCode = new Map<string, ManagedDocumentRecord>();
+          prev.forEach((doc) => byCode.set(doc.code, doc));
+          savedDocs.forEach((doc) => byCode.set(doc.code, doc));
+          return Array.from(byCode.values());
+        });
+      } catch {
+        // Keep UI usable even if demo endpoint is unavailable.
       }
     }
-    fetchUnits();
+
+    loadSavedDocuments();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
-
-  useEffect(() => {
-    fetchApiDocuments();
-  }, [cdateStart, cdateEnd]);
-
-  async function fetchApiDocuments() {
-    setLoading(true);
-    try {
-      const res = await documentsApi.getList({
-        pageIndex: 1,
-        pageSize: 200,
-        cdateStart,
-        cdateEnd,
-      });
-      if (res.data) {
-        const mapped: ManagedDocumentRecord[] = res.data.map((doc) => ({
-          code: doc.documentNo || doc.code || `VB-${doc.id}`,
-          title: doc.subject || 'Văn bản điện tử',
-          type: doc.documentType || 'CONG_VAN',
-          sender: doc.senderName || doc.senderCode || 'Cơ quan gửi',
-          receiver: 'Đơn vị liên thông',
-          version: 'v1',
-          classification: 'Thường',
-          status: doc.status || 'Đang xử lý',
-          createdAt: doc.cdate || new Date().toLocaleDateString('vi-VN'),
-          attachments: [`${(doc.documentNo || 'vb').replace(/\//g, '_')}.pdf`],
-          signProvider: 'USB Token / HSM',
-          signStatus: doc.status === 'Đã phát hành' ? 'Đã ký số' : 'Chưa ký',
-          signedPositions: doc.status === 'Đã phát hành' ? 1 : 0,
-        }));
-        setDocumentList(mapped);
-      }
-    } catch (err) {
-      console.warn('API DOCUMENTS/GetList error', err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   useEffect(() => {
     if (!detailDoc) return;
@@ -341,19 +323,7 @@ export default function DocumentManagementPage() {
     sender: d.sender,
     receiver: d.receiver,
     version: d.version,
-    attachments: (
-      <Chip
-        label={`${d.attachments.length} tệp`}
-        size="small"
-        color="default"
-        variant="outlined"
-        clickable={d.attachments.length > 0}
-        onClick={() => {
-          if (d.attachments.length > 0) setPreviewDoc(d);
-        }}
-        icon={<Iconify icon="solar:eye-bold" width={14} />}
-      />
-    ),
+    attachments: <Chip label={`${d.attachments.length} tệp`} size="small" color="default" variant="outlined" />,
     signStatus: <StatusChip status={d.signStatus} />,
     classification: <StatusChip status={d.classification} />,
     status: <StatusChip status={d.status} />,
@@ -370,14 +340,9 @@ export default function DocumentManagementPage() {
   function handleOpenCreate() {
     setEditingCode(null);
     setAttachmentFiles([]);
-    const defaultSender = unitOptions.length > 0 ? unitOptions[0].code : 'BXD';
-    const defaultRecs = unitOptions.length > 1 ? [unitOptions[1]] : [defaultUnits[0]];
-    setSelectedReceivers(defaultRecs);
     setFormValues({
       ...emptyDocumentForm,
       code: `VB-2026-${String(Date.now()).slice(-6)}`,
-      sender: defaultSender,
-      receiver: defaultRecs.map((r) => r.code).join(', '),
       createdAt: formatDocumentDate(new Date()),
     });
     setOpenForm(true);
@@ -504,88 +469,15 @@ export default function DocumentManagementPage() {
       enqueueSnackbar(`Đã lưu demo: ${saved?.savedTo ?? 'OK'}`, { variant: 'success' });
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Lỗi không xác định';
-      enqueueSnackbar(`Tạo văn bản thất bại: ${message}`, { variant: 'error' });
+      enqueueSnackbar(`Lưu demo thất bại: ${message}`, { variant: 'error' });
     }
   }
 
   return (
     <PageShell
       title="Document Management"
-      subtitle="Quản lý toàn bộ vòng đời văn bản điện tử: tạo mới, metadata, file đính kèm, ký số, gửi nhận và kết nối API /DOCUMENTS/Create."
+      subtitle="Quản lý toàn bộ vòng đời văn bản điện tử: tạo mới, metadata, file đính kèm, ký số, gửi nhận, lưu trữ và tra cứu trên một màn hình."
     >
-      <SectionCard
-        title="Luồng hành trình văn bản"
-        subtitle="Theo dõi chuỗi xử lý từ tạo mới đến lưu trữ dài hạn hoặc hủy."
-      >
-        <Box sx={{ overflowX: 'auto', pb: 0.5 }}>
-          <Stack
-            direction="row"
-            alignItems="stretch"
-            spacing={0}
-            sx={{ minWidth: { xs: 920, lg: '100%' }, width: '100%' }}
-          >
-            {documentLifecycle.map((step, index) => {
-              const isLast = index === documentLifecycle.length - 1;
-              return (
-                <Stack key={step} direction="row" alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack
-                    spacing={1}
-                    alignItems="center"
-                    sx={{
-                      flex: 1,
-                      minWidth: 0,
-                      px: 0.75,
-                      py: 1.25,
-                      borderRadius: 2,
-                      bgcolor: 'background.neutral',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '50%',
-                        display: 'grid',
-                        placeItems: 'center',
-                        bgcolor: 'primary.main',
-                        color: 'common.white',
-                        boxShadow: (theme) => `0 6px 14px ${theme.palette.primary.main}33`,
-                      }}
-                    >
-                      <Iconify icon={lifecycleStepIcons[index] || 'solar:check-circle-bold'} width={20} />
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
-                      Bước {index + 1}
-                    </Typography>
-                    <Typography
-                      variant="subtitle2"
-                      sx={{
-                        lineHeight: 1.25,
-                        px: 0.25,
-                        minHeight: 36,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {step}
-                    </Typography>
-                  </Stack>
-                  {!isLast && (
-                    <Iconify
-                      icon="solar:alt-arrow-right-bold"
-                      width={18}
-                      sx={{ color: 'primary.main', mx: 0.5, flexShrink: 0, opacity: 0.7 }}
-                    />
-                  )}
-                </Stack>
-              );
-            })}
-          </Stack>
-        </Box>
-      </SectionCard>
-
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
         <MetricCard
           label="Tổng văn bản"
@@ -683,7 +575,7 @@ export default function DocumentManagementPage() {
 
       <SectionCard
         title="Danh sách văn bản"
-        subtitle="Kết nối trực tiếp API DOCUMENTS/Create & GetList; hỗ trợ chọn nơi gửi và nhiều nơi nhận."
+        subtitle="Tìm kiếm, lọc, thêm mới và theo dõi ngay cả file đính kèm lẫn trạng thái ký số."
         action={
           <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={handleOpenCreate}>
             Thêm văn bản
@@ -702,35 +594,14 @@ export default function DocumentManagementPage() {
             />
             <TextField
               size="small"
-              type="date"
-              label="Từ ngày (CDATE_START)"
-              InputLabelProps={{ shrink: true }}
-              value={cdateStart}
-              onChange={(e) => setCdateStart(e.target.value)}
-              sx={{ minWidth: 160 }}
-            />
-            <TextField
-              size="small"
-              type="date"
-              label="Đến ngày (CDATE_END)"
-              InputLabelProps={{ shrink: true }}
-              value={cdateEnd}
-              onChange={(e) => setCdateEnd(e.target.value)}
-              sx={{ minWidth: 160 }}
-            />
-            <TextField
-              size="small"
-              label="Loại văn bản"
+              label="Lọc loại văn bản"
               select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               sx={{ minWidth: 180 }}
             >
-              <MenuItem value="">Tất cả</MenuItem>
-              {DOC_TYPES.filter((t) => t !== '').map((t) => (
-                <MenuItem key={t} value={t}>
-                  {t}
-                </MenuItem>
+              {DOC_TYPES.map((t) => (
+                <MenuItem key={t} value={t}>{t === '' ? 'Tất cả' : t}</MenuItem>
               ))}
             </TextField>
           </Stack>
@@ -739,11 +610,11 @@ export default function DocumentManagementPage() {
             columns={[
               { key: 'code', label: 'Số ký hiệu' },
               { key: 'title', label: 'Trích yếu' },
-              { key: 'type', label: 'Loại' },
+              { key: 'type', label: 'Loại', align: 'center' },
               { key: 'sender', label: 'Nơi gửi' },
               { key: 'receiver', label: 'Nơi nhận' },
-              { key: 'version', label: 'Version', align: 'center' },
-              { key: 'attachments', label: 'Đính kèm', align: 'center' },
+              { key: 'version', label: 'Phiên bản', align: 'center' },
+              { key: 'attachments', label: 'Tệp', align: 'center' },
               { key: 'signStatus', label: 'Ký số', align: 'center' },
               { key: 'classification', label: 'Phân loại', align: 'center' },
               { key: 'status', label: 'Trạng thái', align: 'center' },
