@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -15,6 +16,7 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Snackbar,
   Stack,
   Tab,
   Tabs,
@@ -34,18 +36,10 @@ import {
   StatusChip,
 } from '../../sections/interoperability/components';
 import Iconify from '../../components/iconify';
-
-// ── Kịch bản mẫu chuẩn ──────────────────────────────────────────────
-const SCENARIO_SENDER = {
-  unit: 'UBND Hà Nội',
-  person: 'Nguyễn Văn A',
-  title: 'Phó Chủ tịch UBND Hà Nội',
-};
-const SCENARIO_RECEIVERS = ['Sở Nội vụ', 'Sở Thông tin & Truyền thông'];
-const SCENARIO_FILES = [
-  { name: '123_QD_UBND.pdf', type: 'application/pdf', size: '1.8 MB' },
-  { name: '123_QD_UBND.xml', type: 'application/xml', size: '42 KB' },
-];
+import { dipHubApi } from '../../services/dipHubApi';
+import { documentsApi } from '../../services/documentsApi';
+import { dmCategoryApi, getDefaultDateRange } from '../../services/dmCategoryApi';
+import { getApiMessage, isApiSuccess } from '../../utils/axios';
 
 type AttachmentPreview = { fileName: string; type: string; size: string };
 
@@ -204,8 +198,30 @@ const emptyForm: ExchangeTransaction = {
 
 const DOC_TYPES = ['CONG_VAN', 'QUYET_DINH', 'BAO_CAO', 'THONG_BAO', 'KE_HOACH', 'BIEN_NHAN'];
 
+interface UnitOption {
+  code: string;
+  name: string;
+}
+
+const defaultUnits: UnitOption[] = [
+  { code: 'BXD', name: 'Bộ Xây dựng' },
+  { code: 'BCT', name: 'Bộ Công Thương' },
+  { code: 'BTC', name: 'Bộ Tài chính' },
+  { code: 'BNV', name: 'Bộ Nội vụ' },
+  { code: 'UBND_HN', name: 'UBND Thành phố Hà Nội' },
+  { code: 'UBND_HCM', name: 'UBND Thành phố Hồ Chí Minh' },
+];
+
 export default function DocumentExchangePage() {
-  const [list, setList] = useState<ExchangeTransaction[]>(exchangeTransactions);
+  const defaultDates = useMemo(() => getDefaultDateRange(), []);
+  const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
+  const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
+
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>(defaultUnits);
+  const [selectedReceivers, setSelectedReceivers] = useState<UnitOption[]>([defaultUnits[4]]);
+
+  const [list, setList] = useState<ExchangeTransaction[]>([]);
+  const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [openForm, setOpenForm] = useState(false);
@@ -214,6 +230,71 @@ export default function DocumentExchangePage() {
   const [detailTx, setDetailTx] = useState<ExchangeTransaction | null>(null);
   const [detailTab, setDetailTab] = useState(0);
   const [previewFile, setPreviewFile] = useState<AttachmentPreview | null>(null);
+
+  // Notification state
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
+
+  useEffect(() => {
+    async function fetchUnits() {
+      try {
+        const res = await dmCategoryApi.getList({ searchField: { PARENT_CODE: 'DON_VI' } });
+        if (res.data && res.data.length > 0) {
+          const mapped = res.data.map((u) => ({ code: u.code, name: u.name }));
+          setUnitOptions(mapped);
+          if (mapped.length > 1) {
+            setSelectedReceivers([mapped[1]]);
+          }
+        }
+      } catch (e) {
+        console.warn('API fetch units error in DocumentExchangePage', e);
+      }
+    }
+    fetchUnits();
+  }, []);
+
+  useEffect(() => {
+    fetchDocumentsAndTransactions();
+  }, [cdateStart, cdateEnd]);
+
+  async function fetchDocumentsAndTransactions() {
+    setLoading(true);
+    try {
+      const docsRes = await documentsApi.getList({
+        pageIndex: 1,
+        pageSize: 100,
+        cdateStart,
+        cdateEnd,
+      });
+      if (docsRes.data && docsRes.data.length > 0) {
+        const mapped: ExchangeTransaction[] = docsRes.data.map((doc, idx) => ({
+          id: doc.messageId || `TX-${String(1000 + idx)}`,
+          documentCode: doc.documentNo || `DOC-${idx + 1}`,
+          documentTitle: doc.subject || 'Văn bản liên thông',
+          documentType: doc.documentType || 'CONG_VAN',
+          route: `${doc.senderCode} -> TRUC_LT -> RECEIVER`,
+          sender: doc.senderName || doc.senderCode || 'Cơ quan gửi',
+          senderPerson: 'Cán bộ văn thư',
+          senderTitle: 'Chuyên viên',
+          receiver: 'Đơn vị liên thông',
+          status: (doc.status?.toLowerCase() === 'received' ? 'received' : 'sent') as any,
+          ack: 'ACK',
+          retries: 0,
+          sentAt: doc.cdate || new Date().toLocaleDateString('vi-VN'),
+          receivedAt: new Date().toLocaleDateString('vi-VN'),
+          updatedAt: doc.cdate || new Date().toLocaleDateString('vi-VN'),
+        }));
+        setList(mapped);
+      }
+    } catch (err) {
+      console.warn('Unable to load documents from backend API, using initial mock transactions', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(
     () =>
@@ -234,16 +315,25 @@ export default function DocumentExchangePage() {
       <Typography
         variant="body2"
         sx={{ cursor: 'pointer', color: 'primary.main', fontWeight: 600 }}
-        onClick={() => { setDetailTx(tx); setDetailTab(0); }}
+        onClick={() => {
+          setDetailTx(tx);
+          setDetailTab(0);
+        }}
       >
         {tx.id}
       </Typography>
     ),
     documentCode: (
       <Stack>
-        <Typography variant="body2" fontWeight={600}>{tx.documentCode}</Typography>
+        <Typography variant="body2" fontWeight={600}>
+          {tx.documentCode}
+        </Typography>
         {tx.documentTitle && (
-          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
             {tx.documentTitle}
           </Typography>
         )}
@@ -252,9 +342,7 @@ export default function DocumentExchangePage() {
     sender: (
       <Stack>
         <Typography variant="body2">{tx.sender}</Typography>
-        {tx.senderPerson && (
-          <Typography variant="caption" color="text.secondary">{tx.senderPerson}</Typography>
-        )}
+        {tx.senderPerson && <Typography variant="caption" color="text.secondary">{tx.senderPerson}</Typography>}
       </Stack>
     ),
     receiver: <Typography variant="body2">{tx.receiver}</Typography>,
@@ -265,7 +353,10 @@ export default function DocumentExchangePage() {
     actions: (
       <TransactionActionsMenu
         tx={tx}
-        onDetail={() => { setDetailTx(tx); setDetailTab(0); }}
+        onDetail={() => {
+          setDetailTx(tx);
+          setDetailTab(0);
+        }}
         onEdit={() => handleEdit(tx)}
         onReplay={() => handleReplay(tx.id)}
         onDelete={() => handleDelete(tx.id)}
@@ -278,7 +369,10 @@ export default function DocumentExchangePage() {
     setFormValues({
       ...emptyForm,
       id: `TX-${String(Date.now()).slice(-10)}`,
-      sentAt: new Date().toLocaleDateString('vi-VN').replace(/\//g, '/') + ' ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      sentAt:
+        new Date().toLocaleDateString('vi-VN').replace(/\//g, '/') +
+        ' ' +
+        new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       updatedAt: new Date().toLocaleDateString('vi-VN'),
     });
     setOpenForm(true);
@@ -297,24 +391,112 @@ export default function DocumentExchangePage() {
   function handleReplay(id: string) {
     setList((prev) =>
       prev.map((tx) =>
-        tx.id === id ? { ...tx, status: 'retrying', ack: 'WAITING', retries: tx.retries + 1, updatedAt: '20/07/2026 10:00' } : tx
+        tx.id === id ? { ...tx, status: 'retrying', ack: 'WAITING', retries: tx.retries + 1, updatedAt: new Date().toLocaleDateString('vi-VN') } : tx
       )
     );
+    setToast({ open: true, message: `Đã phát lại giao dịch ${id}`, severity: 'info' });
   }
 
-  function handleSubmit() {
+  // Gọi API DIP_Hub/Send khi người dùng tạo/lưu giao dịch
+  async function handleSubmit() {
     if (!formValues.id || !formValues.documentCode || !formValues.sender || !formValues.receiver) return;
-    const next = {
-      ...formValues,
-      route: formValues.route || `${formValues.sender} -> TRUC_LT -> ${formValues.receiver}`,
-      updatedAt: formValues.sentAt || formValues.updatedAt,
-    };
-    if (editingId) {
-      setList((prev) => prev.map((tx) => (tx.id === editingId ? next : tx)));
+
+    const receiverCodes = selectedReceivers.map((r) => r.code);
+
+    // Call Backend DIP_Hub/Send API
+    const sendRes = await dipHubApi.sendDocument({
+      header: {
+        document_No: formValues.documentCode,
+        document_Type: formValues.documentType || 'CONG_VAN',
+        subject: formValues.documentTitle || 'Văn bản liên thông',
+        sender_Code: formValues.sender,
+        receiver_Code: receiverCodes,
+        priority: '1',
+        issue_Date: new Date().toISOString().slice(0, 10),
+      },
+      body: [
+        {
+          file_Name: `${formValues.documentCode.replace(/\//g, '_')}.pdf`,
+          data_Type: 'pdf',
+          content_Type: 'application/pdf',
+          file_URL: 'http://minio.gov.vn/documents/sample.pdf',
+        },
+      ],
+    });
+
+    const isSuccess = isApiSuccess(sendRes);
+    const msg = getApiMessage(sendRes, isSuccess ? 'Gửi văn bản qua API DIP_Hub/Send thành công!' : 'Gửi văn bản thất bại');
+
+    if (isSuccess) {
+      const next: ExchangeTransaction = {
+        ...formValues,
+        route: formValues.route || `${formValues.sender} -> TRUC_LT -> ${formValues.receiver}`,
+        updatedAt: formValues.sentAt || formValues.updatedAt,
+        status: 'sent',
+      };
+
+      if (editingId) {
+        setList((prev) => prev.map((tx) => (tx.id === editingId ? next : tx)));
+      } else {
+        setList((prev) => [next, ...prev]);
+      }
+      setToast({ open: true, message: msg, severity: 'success' });
+      setOpenForm(false);
     } else {
-      setList((prev) => [next, ...prev]);
+      setToast({
+        open: true,
+        message: `Lỗi API DIP_Hub/Send [ResultCode: ${sendRes.resultCode || sendRes.ResultCode}]: ${msg}`,
+        severity: 'error',
+      });
     }
-    setOpenForm(false);
+  }
+
+  // Gọi API Tiếp nhận văn bản (DIP_Hub/Receive)
+  async function handleReceiveApi(tx: ExchangeTransaction) {
+    const res = await dipHubApi.receiveDocument({
+      document_Id: tx.id,
+      sender_Code: tx.sender,
+      receiver_Code: tx.receiver,
+    });
+
+    const isSuccess = isApiSuccess(res);
+    const msg = getApiMessage(res, isSuccess ? 'Tiếp nhận văn bản thành công (DIP_Hub/Receive)!' : 'Tiếp nhận thất bại');
+
+    if (isSuccess) {
+      setList((prev) =>
+        prev.map((item) => (item.id === tx.id ? { ...item, status: 'received', receivedAt: new Date().toLocaleString('vi-VN') } : item))
+      );
+      setToast({ open: true, message: msg, severity: 'success' });
+    } else {
+      setToast({
+        open: true,
+        message: `Lỗi API DIP_Hub/Receive [ResultCode: ${res.resultCode || res.ResultCode}]: ${msg}`,
+        severity: 'error',
+      });
+    }
+  }
+
+  // Gọi API Phản hồi / Xác nhận ACK (DIP_Hub/Ack)
+  async function handleAckApi(tx: ExchangeTransaction, status: 'ACK' | 'NACK') {
+    const res = await dipHubApi.ackDocument({
+      document_Id: tx.id,
+      receiver_Code: tx.receiver,
+      status,
+    });
+
+    const isSuccess = isApiSuccess(res);
+    const msg = getApiMessage(res, isSuccess ? `Đã gửi xác nhận ${status} qua API DIP_Hub/Ack` : `Xác nhận ${status} thất bại`);
+
+    if (isSuccess) {
+      setList((prev) => prev.map((item) => (item.id === tx.id ? { ...item, ack: status } : item)));
+      setToast({ open: true, message: msg, severity: status === 'ACK' ? 'success' : 'info' });
+    } else {
+      setToast({
+        open: true,
+        message: `Lỗi API DIP_Hub/Ack [ResultCode: ${res.resultCode || res.ResultCode}]: ${msg}`,
+        severity: 'error',
+      });
+    }
   }
 
   const stats = {
@@ -330,23 +512,32 @@ export default function DocumentExchangePage() {
       title="Document Exchange"
       subtitle="Theo dõi hành trình giao nhận văn bản: gửi từ đâu, qua route nào, đến ai, ACK ra sao, có retry hay phát sinh lỗi không."
     >
-
       {/* ── Metrics ── */}
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
-        <MetricCard label="Tổng giao dịch" value={stats.total} helper="Trong tất cả thời gian" icon="solar:inbox-in-bold" />
-        <MetricCard label="Tỷ lệ thành công" value={`${Math.round((stats.received / Math.max(stats.total, 1)) * 100)}%`} helper={`${stats.received} giao dịch RECEIVED`} icon="solar:check-read-bold" />
+        <MetricCard label="Tổng giao dịch" value={stats.total} helper="Từ API DOCUMENTS & DIP_Hub" icon="solar:inbox-in-bold" />
+        <MetricCard
+          label="Tỷ lệ thành công"
+          value={`${Math.round((stats.received / Math.max(stats.total, 1)) * 100)}%`}
+          helper={`${stats.received} giao dịch RECEIVED`}
+          icon="solar:check-read-bold"
+        />
         <MetricCard label="Đang chờ ACK" value={stats.waiting} helper="WAITING — chưa nhận xác nhận" icon="solar:chat-round-line-bold" />
         <MetricCard label="Lỗi / Retry" value={`${stats.failed} / ${stats.retrying}`} helper="Failed cần xử lý thủ công" icon="solar:restart-bold" />
       </GridRow>
 
       {/* ── Bảng Delivery Tracking ── */}
       <SectionCard
-        title="Theo dõi giao dịch"
-        subtitle="Lịch sử giao dịch liên thông. Bấm Transaction ID hoặc Chi tiết để xem đầy đủ thông tin, lý do lỗi, thời gian gửi/nhận."
+        title="Theo dõi giao dịch liên thông"
+        subtitle="Quản lý lịch sử giao dịch liên thông qua API DIP_Hub & DIP_INTERNAL."
         action={
-          <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={handleOpenCreate}>
-            Thêm giao dịch
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={fetchDocumentsAndTransactions} disabled={loading}>
+              {loading ? 'Đang tải...' : 'Làm mới (API)'}
+            </Button>
+            <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={handleOpenCreate}>
+              Gửi văn bản mới
+            </Button>
+          </Stack>
         }
       >
         <Stack spacing={2}>
@@ -358,6 +549,24 @@ export default function DocumentExchangePage() {
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="Transaction ID, văn bản, nơi gửi, nơi nhận..."
               sx={{ flex: 1 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Từ ngày (CDATE_START)"
+              InputLabelProps={{ shrink: true }}
+              value={cdateStart}
+              onChange={(e) => setCdateStart(e.target.value)}
+              sx={{ minWidth: 170 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Đến ngày (CDATE_END)"
+              InputLabelProps={{ shrink: true }}
+              value={cdateEnd}
+              onChange={(e) => setCdateEnd(e.target.value)}
+              sx={{ minWidth: 170 }}
             />
             <TextField
               size="small"
@@ -400,7 +609,9 @@ export default function DocumentExchangePage() {
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                 <Box>
                   <Typography variant="h6">{detailTx.id}</Typography>
-                  <Typography variant="body2" color="text.secondary">{detailTx.documentCode} — {detailTx.documentTitle}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {detailTx.documentCode} — {detailTx.documentTitle}
+                  </Typography>
                 </Box>
                 <Stack direction="row" spacing={1}>
                   <StatusChip status={detailTx.status} />
@@ -413,10 +624,7 @@ export default function DocumentExchangePage() {
               <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 2 }}>
                 <Tab label="Metadata" icon={<Iconify icon="solar:document-text-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
                 <Tab label="File đính kèm" icon={<Iconify icon="solar:paperclip-2-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                <Tab label="Lịch sử trạng thái" icon={<Iconify icon="solar:history-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                {(detailTx.errorReason) && (
-                  <Tab label="Lỗi" icon={<Iconify icon="solar:bug-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40, color: 'error.main' }} />
-                )}
+                <Tab label="Thao tác API (Receive/ACK)" icon={<Iconify icon="solar:round-transfer-horizontal-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
               </Tabs>
 
               {detailTab === 0 && (
@@ -433,21 +641,17 @@ export default function DocumentExchangePage() {
                     { label: 'Thời gian nhận', value: detailTx.receivedAt || '—' },
                     { label: 'Cập nhật lần cuối', value: detailTx.updatedAt },
                     { label: 'Số lần retry', value: String(detailTx.retries) },
-                    { label: 'ACK', value: detailTx.ack },
+                    { label: 'ACK Status', value: detailTx.ack },
                   ].map((row) => (
                     <Grid key={row.label} item xs={12} sm={6}>
                       <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                        <Typography variant="caption" color="text.secondary">{row.label}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {row.label}
+                        </Typography>
                         <Typography variant="subtitle2">{row.value}</Typography>
                       </Box>
                     </Grid>
                   ))}
-                  <Grid item xs={12}>
-                    <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                      <Typography variant="caption" color="text.secondary">Trích yếu</Typography>
-                      <Typography variant="body2">{detailTx.documentTitle || '—'}</Typography>
-                    </Box>
-                  </Grid>
                 </Grid>
               )}
 
@@ -478,225 +682,173 @@ export default function DocumentExchangePage() {
                         />
                       ),
                     },
-                    {
-                      fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.xml`,
-                      type: 'application/xml',
-                      size: '38 KB',
-                      uploadedAt: detailTx.sentAt || detailTx.updatedAt,
-                      actions: (
-                        <AttachmentActionsMenu
-                          file={{
-                            fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.xml`,
-                            type: 'application/xml',
-                            size: '38 KB',
-                          }}
-                          onPreview={setPreviewFile}
-                        />
-                      ),
-                    },
                   ]}
                 />
               )}
 
               {detailTab === 2 && (
-                <DataTable
-                  columns={[
-                    { key: 'time', label: 'Thời gian' },
-                    { key: 'event', label: 'Sự kiện' },
-                    { key: 'actor', label: 'Thực hiện bởi' },
-                    { key: 'detail', label: 'Chi tiết' },
-                  ]}
-                  rows={[
-                    { time: detailTx.sentAt || detailTx.updatedAt, event: 'Tiếp nhận gửi', actor: detailTx.senderPerson || detailTx.sender, detail: `Văn bản ${detailTx.documentCode} nộp vào hàng đợi giao nhận` },
-                    { time: detailTx.sentAt || detailTx.updatedAt, event: 'Định tuyến', actor: 'Hệ thống TRUC_LT', detail: `Route: ${detailTx.route}` },
-                    ...(detailTx.retries > 0 ? Array.from({ length: detailTx.retries }, (_, i) => ({
-                      time: detailTx.updatedAt,
-                      event: `Retry lần ${i + 1}`,
-                      actor: 'Hệ thống TRUC_LT',
-                      detail: detailTx.errorReason ? `Lỗi: ${detailTx.errorReason}. Thử lại tự động.` : `Retry #${i + 1}`,
-                    })) : []),
-                    ...(detailTx.status === 'received' ? [{ time: detailTx.receivedAt || detailTx.updatedAt, event: 'Giao thành công', actor: detailTx.receiver, detail: 'Đơn vị nhận xác nhận ACK, hoàn tất giao dịch' }] : []),
-                    ...(detailTx.status === 'failed' ? [{ time: detailTx.updatedAt, event: 'Thất bại', actor: 'Hệ thống TRUC_LT', detail: detailTx.errorDetail || 'Giao dịch thất bại sau số lần retry tối đa' }] : []),
-                  ]}
-                />
-              )}
-
-              {detailTab === 3 && detailTx.errorReason && (
-                <Stack spacing={2}>
-                  <Alert severity="error" icon={<Iconify icon="solar:bug-bold" />}>
-                    <Typography variant="subtitle2">{detailTx.errorReason}</Typography>
+                <Stack spacing={2} sx={{ pt: 1 }}>
+                  <Alert severity="info">
+                    Thực hiện kiểm thử các API tiếp nhận (`/DIP_Hub/Receive`) và xác nhận phản hồi (`/DIP_Hub/Ack`) cho thông điệp này.
                   </Alert>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'error.lighter' }}>
-                    <Typography variant="body2" color="error.darker">{detailTx.errorDetail}</Typography>
-                  </Box>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Hướng dẫn xử lý</Typography>
-                    {detailTx.errorReason === 'API Timeout' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Kiểm tra trạng thái endpoint đơn vị nhận.</Typography>
-                        <Typography variant="body2">2. Nếu endpoint đã ổn định, bấm <strong>Replay</strong> để thử lại.</Typography>
-                        <Typography variant="body2">3. Nếu vẫn lỗi, liên hệ quản trị viên kiểm tra network.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Signature Error' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Yêu cầu đơn vị gửi ký lại văn bản với chứng thư số còn hiệu lực.</Typography>
-                        <Typography variant="body2">2. Đảm bảo file PDF và XML được ký cùng một lần, không chỉnh sửa sau ký.</Typography>
-                        <Typography variant="body2">3. Gửi lại giao dịch sau khi đã ký đúng.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Routing Error' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Vào <strong>Kết nối liên thông</strong> → tab <strong>Endpoint</strong> để kiểm tra cấu hình route.</Typography>
-                        <Typography variant="body2">2. Cập nhật đúng agencyCode và endpoint URL cho đơn vị nhận.</Typography>
-                        <Typography variant="body2">3. Bấm <strong>Replay</strong> sau khi route đã được sửa.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Auth Failed' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Vào <strong>Kết nối liên thông</strong> → tab <strong>API Key</strong> hoặc <strong>Credential</strong>.</Typography>
-                        <Typography variant="body2">2. Cấp lại API Key hoặc renew certificate cho đơn vị liên quan.</Typography>
-                        <Typography variant="body2">3. Bấm <strong>Replay</strong> sau khi thông tin xác thực đã cập nhật.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Storage Error' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Hệ thống đang tự chuyển sang node lưu trữ dự phòng.</Typography>
-                        <Typography variant="body2">2. Chờ hệ thống retry tự động. Nếu không tự phục hồi, liên hệ quản trị viên hạ tầng.</Typography>
-                      </Stack>
-                    )}
-                  </Box>
+                  <Stack direction="row" spacing={2}>
+                    <Button
+                      variant="contained"
+                      color="info"
+                      startIcon={<Iconify icon="solar:inbox-in-bold" />}
+                      onClick={() => handleReceiveApi(detailTx)}
+                    >
+                      Gọi API Receive (Tiếp nhận)
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      startIcon={<Iconify icon="solar:check-circle-bold" />}
+                      onClick={() => handleAckApi(detailTx, 'ACK')}
+                    >
+                      Gửi ACK (Xác nhận thành công)
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<Iconify icon="solar:close-circle-bold" />}
+                      onClick={() => handleAckApi(detailTx, 'NACK')}
+                    >
+                      Gửi NACK (Báo lỗi)
+                    </Button>
+                  </Stack>
                 </Stack>
               )}
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setDetailTx(null)}>Đóng</Button>
-              {(detailTx.status === 'failed' || detailTx.status === 'retrying') && (
-                <Button variant="contained" color="warning" onClick={() => { handleReplay(detailTx.id); setDetailTx(null); }}>
-                  Replay giao dịch
-                </Button>
-              )}
             </DialogActions>
           </>
         )}
       </Dialog>
 
-      <Dialog open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Xem file đính kèm</DialogTitle>
-        <DialogContent>
-          {previewFile && (
-            <Stack spacing={2} sx={{ pt: 1 }}>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Iconify
-                    icon={previewFile.type.includes('pdf') ? 'solar:file-text-bold' : 'solar:code-file-bold'}
-                    width={28}
-                    sx={{ color: 'primary.main' }}
-                  />
-                  <Box>
-                    <Typography variant="subtitle1">{previewFile.fileName}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {previewFile.type} · {previewFile.size}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
-              <Alert severity="info">
-                Đây là bản xem nhanh demo. Nội dung file thực tế sẽ được tải từ kho lưu trữ khi kết nối backend.
-              </Alert>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPreviewFile(null)}>Đóng</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── Dialog Thêm/Sửa ── */}
+      {/* ── Dialog Gửi văn bản mới (Call DIP_Hub/Send) ── */}
       <Dialog open={openForm} onClose={() => setOpenForm(false)} fullWidth maxWidth="md">
-        <DialogTitle>{editingId ? 'Cập nhật giao dịch' : 'Tạo giao dịch mới'}</DialogTitle>
+        <DialogTitle>{editingId ? 'Cập nhật giao dịch' : 'Gửi văn bản liên thông mới (DIP_Hub/Send)'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Transaction ID" disabled={Boolean(editingId)}
-                value={formValues.id} onChange={(e) => setFormValues((p) => ({ ...p, id: e.target.value }))} />
+              <TextField
+                fullWidth
+                label="Transaction ID (Message ID)"
+                disabled={Boolean(editingId)}
+                value={formValues.id}
+                onChange={(e) => setFormValues((p) => ({ ...p, id: e.target.value }))}
+              />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Số ký hiệu văn bản"
-                value={formValues.documentCode} onChange={(e) => setFormValues((p) => ({ ...p, documentCode: e.target.value }))} />
+              <TextField
+                fullWidth
+                label="Số ký hiệu văn bản (Document No)"
+                value={formValues.documentCode}
+                onChange={(e) => setFormValues((p) => ({ ...p, documentCode: e.target.value }))}
+              />
             </Grid>
             <Grid item xs={12}>
-              <TextField fullWidth label="Trích yếu"
-                value={formValues.documentTitle || ''} onChange={(e) => setFormValues((p) => ({ ...p, documentTitle: e.target.value }))} />
+              <TextField
+                fullWidth
+                label="Trích yếu (Subject)"
+                value={formValues.documentTitle || ''}
+                onChange={(e) => setFormValues((p) => ({ ...p, documentTitle: e.target.value }))}
+              />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Loại văn bản" select value={formValues.documentType || 'CONG_VAN'}
-                onChange={(e) => setFormValues((p) => ({ ...p, documentType: e.target.value }))}>
-                {DOC_TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+              <TextField
+                fullWidth
+                label="Loại văn bản"
+                select
+                value={formValues.documentType || 'CONG_VAN'}
+                onChange={(e) => setFormValues((p) => ({ ...p, documentType: e.target.value }))}
+              >
+                {DOC_TYPES.map((t) => (
+                  <MenuItem key={t} value={t}>
+                    {t}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Route"
-                value={formValues.route} onChange={(e) => setFormValues((p) => ({ ...p, route: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Nơi gửi"
-                value={formValues.sender} onChange={(e) => setFormValues((p) => ({ ...p, sender: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Người gửi"
-                value={formValues.senderPerson || ''} onChange={(e) => setFormValues((p) => ({ ...p, senderPerson: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Chức danh người gửi"
-                value={formValues.senderTitle || ''} onChange={(e) => setFormValues((p) => ({ ...p, senderTitle: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Nơi nhận"
-                value={formValues.receiver} onChange={(e) => setFormValues((p) => ({ ...p, receiver: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth label="Trạng thái" select value={formValues.status}
-                onChange={(e) => setFormValues((p) => ({ ...p, status: e.target.value as ExchangeTransaction['status'] }))}>
-                <MenuItem value="sent">sent</MenuItem>
-                <MenuItem value="received">received</MenuItem>
-                <MenuItem value="failed">failed</MenuItem>
-                <MenuItem value="retrying">retrying</MenuItem>
+              <TextField
+                fullWidth
+                select
+                label="Mã đơn vị gửi (Sender Code)"
+                value={formValues.sender}
+                onChange={(e) => setFormValues((p) => ({ ...p, sender: e.target.value }))}
+              >
+                {unitOptions.map((unit) => (
+                  <MenuItem key={unit.code} value={unit.code}>
+                    {unit.code} - {unit.name}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth label="ACK" select value={formValues.ack}
-                onChange={(e) => setFormValues((p) => ({ ...p, ack: e.target.value as ExchangeTransaction['ack'] }))}>
-                <MenuItem value="ACK">ACK</MenuItem>
-                <MenuItem value="NACK">NACK</MenuItem>
-                <MenuItem value="WAITING">WAITING</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth type="number" label="Số lần retry"
-                value={formValues.retries} onChange={(e) => setFormValues((p) => ({ ...p, retries: Number(e.target.value) }))} />
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                multiple
+                options={unitOptions}
+                getOptionLabel={(option) => `${option.code} - ${option.name}`}
+                value={selectedReceivers}
+                isOptionEqualToValue={(option, value) => option.code === value.code}
+                onChange={(_, newValue) => {
+                  setSelectedReceivers(newValue);
+                  setFormValues((p) => ({
+                    ...p,
+                    receiver: newValue.map((item) => item.code).join(', '),
+                  }));
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Mã đơn vị nhận (Receiver Code - Chọn 1 hoặc nhiều)"
+                    placeholder="Chọn các đơn vị nhận"
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      key={option.code}
+                      label={`${option.code}`}
+                      size="small"
+                      {...getTagProps({ index })}
+                    />
+                  ))
+                }
+              />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Thời gian gửi"
-                value={formValues.sentAt || ''} onChange={(e) => setFormValues((p) => ({ ...p, sentAt: e.target.value }))} />
+              <TextField
+                fullWidth
+                label="Thời gian phát hành"
+                value={formValues.sentAt || ''}
+                onChange={(e) => setFormValues((p) => ({ ...p, sentAt: e.target.value }))}
+              />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Lý do lỗi (nếu có)"
-                value={formValues.errorReason || ''} onChange={(e) => setFormValues((p) => ({ ...p, errorReason: e.target.value }))} />
-            </Grid>
-            {formValues.errorReason && (
-              <Grid item xs={12}>
-                <TextField fullWidth multiline rows={3} label="Chi tiết lỗi"
-                  value={formValues.errorDetail || ''} onChange={(e) => setFormValues((p) => ({ ...p, errorDetail: e.target.value }))} />
-              </Grid>
-            )}
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenForm(false)}>Hủy</Button>
-          <Button variant="contained" onClick={handleSubmit}>Lưu</Button>
+          <Button variant="contained" onClick={handleSubmit}>
+            Gửi (Call API DIP_Hub/Send)
+          </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar Toast */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity={toast.severity} onClose={() => setToast((p) => ({ ...p, open: false }))}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </PageShell>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -12,9 +12,11 @@ import {
   TextField,
 } from '@mui/material';
 import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
+import { dmCategoryApi, DMCategoryItem, getDefaultDateRange } from '../../services/dmCategoryApi';
 
 type CategoryRecord = {
   id: string;
+  numericId?: number;
   group:
     | 'Loại văn bản'
     | 'Độ khẩn'
@@ -24,61 +26,71 @@ type CategoryRecord = {
     | 'Hình thức gửi/nhận';
   code: string;
   name: string;
+  parentCode: string;
   status: 'Active' | 'Inactive';
   updatedAt: string;
 };
 
-const initialCategories: CategoryRecord[] = [
-  {
-    id: 'CAT-0001',
-    group: 'Loại văn bản',
-    code: 'CONG_VAN',
-    name: 'Công văn',
-    status: 'Active',
-    updatedAt: '25/06/2026 08:12',
-  },
-  {
-    id: 'CAT-0002',
-    group: 'Độ khẩn',
-    code: 'KHAN',
-    name: 'Khẩn',
-    status: 'Active',
-    updatedAt: '25/06/2026 08:12',
-  },
-  {
-    id: 'CAT-0003',
-    group: 'Độ mật',
-    code: 'MAT',
-    name: 'Mật',
-    status: 'Active',
-    updatedAt: '25/06/2026 08:12',
-  },
-  {
-    id: 'CAT-0004',
-    group: 'Trạng thái',
-    code: 'DA_PHAT_HANH',
-    name: 'Đã phát hành',
-    status: 'Active',
-    updatedAt: '25/06/2026 08:12',
-  },
-];
+const DEFAULT_PARENT_CODE = 'DANH_MUC';
 
 const emptyForm: CategoryRecord = {
   id: '',
   group: 'Loại văn bản',
   code: '',
   name: '',
+  parentCode: DEFAULT_PARENT_CODE,
   status: 'Active',
   updatedAt: '',
 };
 
 export default function CategoriesPage() {
-  const [rows, setRows] = useState<CategoryRecord[]>(initialCategories);
+  const defaultDates = useMemo(() => getDefaultDateRange(), []);
+  const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
+  const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
+  const [parentCodeFilter, setParentCodeFilter] = useState(DEFAULT_PARENT_CODE);
+
+  const [rows, setRows] = useState<CategoryRecord[]>([]);
+  const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [openEditor, setOpenEditor] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<CategoryRecord>(emptyForm);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Fetch API DM_CATEGORY với filter PARENT_CODE = DANH_MUC
+  useEffect(() => {
+    fetchCategories();
+  }, [cdateStart, cdateEnd, parentCodeFilter]);
+
+  async function fetchCategories() {
+    setLoading(true);
+    try {
+      const res = await dmCategoryApi.getList({
+        pageIndex: 1,
+        pageSize: 200,
+        cdateStart,
+        cdateEnd,
+        searchField: parentCodeFilter ? { PARENT_CODE: parentCodeFilter } : {},
+      });
+      if (res.data) {
+        const mapped: CategoryRecord[] = res.data.map((item) => ({
+          id: item.id ? `CAT-${item.id}` : item.code,
+          numericId: item.id,
+          group: (item.description as any) || 'Loại văn bản',
+          code: item.code,
+          name: item.name,
+          parentCode: item.parentCode || parentCodeFilter,
+          status: item.isActive === 1 ? 'Active' : 'Inactive',
+          updatedAt: item.cdate || new Date().toLocaleDateString('vi-VN'),
+        }));
+        setRows(mapped);
+      }
+    } catch (err) {
+      console.warn('Backend API DM_CATEGORY unavailable', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -116,6 +128,7 @@ export default function CategoriesPage() {
     setFormValues({
       ...emptyForm,
       id: `CAT-${String(Date.now()).slice(-6)}`,
+      parentCode: parentCodeFilter || DEFAULT_PARENT_CODE,
       updatedAt: new Date().toLocaleString('vi-VN'),
     });
     setOpenEditor(true);
@@ -127,20 +140,40 @@ export default function CategoriesPage() {
     setOpenEditor(true);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!formValues.code || !formValues.name) return;
-    const payload: CategoryRecord = { ...formValues, updatedAt: new Date().toLocaleString('vi-VN') };
 
-    if (editingId) {
-      setRows((prev) => prev.map((item) => (item.id === editingId ? payload : item)));
+    const apiItem: DMCategoryItem = {
+      id: formValues.numericId,
+      code: formValues.code,
+      name: formValues.name,
+      parentCode: formValues.parentCode || parentCodeFilter || DEFAULT_PARENT_CODE,
+      description: formValues.group,
+      isActive: formValues.status === 'Active' ? 1 : 0,
+      status: 1,
+    };
+
+    const res = await dmCategoryApi.createOrUpdate(apiItem);
+    if (res.success) {
+      await fetchCategories();
+      setOpenEditor(false);
     } else {
-      setRows((prev) => [payload, ...prev]);
+      alert(`Lỗi API /DM_CATEGORY/Create: ${res.message}`);
     }
-    setOpenEditor(false);
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!deletingId) return;
+    const target = rows.find((r) => r.id === deletingId);
+
+    if (target?.numericId) {
+      const res = await dmCategoryApi.delete(target.numericId);
+      if (!res.success) {
+        alert(`Lỗi xóa API: ${res.message}`);
+        return;
+      }
+    }
+
     setRows((prev) => prev.filter((item) => item.id !== deletingId));
     setDeletingId(null);
   }
@@ -148,13 +181,13 @@ export default function CategoriesPage() {
   return (
     <PageShell
       title="Danh mục dùng chung"
-      subtitle="Quản lý danh mục: loại văn bản, độ khẩn/mật, lĩnh vực, trạng thái, hình thức gửi/nhận. CRUD tách riêng và thao tác bằng modal."
+      subtitle="Quản lý danh mục: loại văn bản, độ khẩn/mật, lĩnh vực, trạng thái, hình thức gửi/nhận. Lọc và lưu mặc định PARENT_CODE = DANH_MUC."
     >
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
         <MetricCard
           label="Tổng mục"
           value={rows.length}
-          helper="Dữ liệu demo (local state)"
+          helper={`Filter PARENT_CODE: ${parentCodeFilter}`}
           icon="solar:widget-2-bold"
         />
         <MetricCard
@@ -178,38 +211,72 @@ export default function CategoriesPage() {
       </GridRow>
 
       <SectionCard
-            title="Danh sách danh mục"
-            subtitle="Màn hình danh mục tách riêng; thêm/sửa/xóa bằng modal."
-            action={
-              <Button variant="contained" onClick={handleOpenCreate}>
-                Thêm danh mục
-              </Button>
-            }
-          >
-            <Stack spacing={2}>
-              <TextField
-                size="small"
-                label="Tìm kiếm"
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-                placeholder="Nhóm, mã, tên, trạng thái"
-              />
+        title="Danh sách danh mục"
+        subtitle="Màn hình danh mục kết nối API DM_CATEGORY."
+        action={
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={fetchCategories} disabled={loading}>
+              {loading ? 'Đang tải...' : 'Làm mới (API)'}
+            </Button>
+            <Button variant="contained" onClick={handleOpenCreate}>
+              Thêm danh mục
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+            <TextField
+              size="small"
+              label="Tìm kiếm"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="Nhóm, mã, tên, trạng thái"
+              sx={{ flex: 1 }}
+            />
+            <TextField
+              size="small"
+              label="Mã nhóm (PARENT_CODE)"
+              value={parentCodeFilter}
+              onChange={(e) => setParentCodeFilter(e.target.value)}
+              placeholder="Mặc định DANH_MUC"
+              sx={{ minWidth: 200 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Từ ngày (CDATE_START)"
+              InputLabelProps={{ shrink: true }}
+              value={cdateStart}
+              onChange={(e) => setCdateStart(e.target.value)}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Đến ngày (CDATE_END)"
+              InputLabelProps={{ shrink: true }}
+              value={cdateEnd}
+              onChange={(e) => setCdateEnd(e.target.value)}
+              sx={{ minWidth: 160 }}
+            />
+          </Stack>
 
-              <Box sx={{ overflowX: 'auto' }}>
-                <DataTable
-                  columns={[
-                    { key: 'group', label: 'Nhóm' },
-                    { key: 'code', label: 'Mã' },
-                    { key: 'name', label: 'Tên' },
-                    { key: 'status', label: 'Trạng thái', align: 'center' },
-                    { key: 'updatedAt', label: 'Cập nhật', align: 'center' },
-                    { key: 'actions', label: 'Thao tác', align: 'right' },
-                  ]}
-                  rows={tableRows}
-                />
-              </Box>
-            </Stack>
-          </SectionCard>
+          <Box sx={{ overflowX: 'auto' }}>
+            <DataTable
+              columns={[
+                { key: 'group', label: 'Nhóm' },
+                { key: 'code', label: 'Mã' },
+                { key: 'name', label: 'Tên' },
+                { key: 'status', label: 'Trạng thái', align: 'center' },
+                { key: 'updatedAt', label: 'Cập nhật', align: 'center' },
+                { key: 'actions', label: 'Thao tác', align: 'right' },
+              ]}
+              rows={tableRows}
+            />
+          </Box>
+        </Stack>
+      </SectionCard>
 
       <Dialog open={openEditor} onClose={() => setOpenEditor(false)} fullWidth maxWidth="md">
         <DialogTitle>{editingId ? 'Cập nhật danh mục' : 'Tạo mới danh mục'}</DialogTitle>
@@ -217,6 +284,14 @@ export default function CategoriesPage() {
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12} md={4}>
               <TextField fullWidth label="Mã nội bộ" disabled value={formValues.id} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="PARENT_CODE (Nhóm cha)"
+                value={formValues.parentCode}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, parentCode: event.target.value }))}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
@@ -294,4 +369,3 @@ export default function CategoriesPage() {
     </PageShell>
   );
 }
-
