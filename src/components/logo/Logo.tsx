@@ -1,8 +1,7 @@
 import { forwardRef } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 // @mui
-import { useTheme } from '@mui/material/styles';
-import { Box, Link, BoxProps } from '@mui/material';
+import { Box, Link, Typography, BoxProps } from '@mui/material';
 
 // ----------------------------------------------------------------------
 
@@ -12,24 +11,41 @@ export interface LogoProps extends BoxProps {
 
 const Logo = forwardRef<HTMLDivElement, LogoProps>(
   ({ disabledLink = false, sx, ...other }, ref) => {
-    const theme = useTheme();
-
-    const PRIMARY_LIGHT = theme.palette.primary.light;
-
-    const PRIMARY_MAIN = theme.palette.primary.main;
-
-    const PRIMARY_DARK = theme.palette.primary.dark;
-
-    // OR using local (public folder)
-    // -------------------------------------------------------
     const logo = (
       <Box
-        component="img"
-        src="/logo/logoSignet.png"
-        sx={{cursor: 'pointer', ...sx }}
-      />
+        ref={ref}
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 1.25,
+          height: 40,
+          fontSize: 40,
+          cursor: 'pointer',
+          ...sx,
+        }}
+        {...other}
+      >
+        <Box
+          component="img"
+          src="/logo/signet.png"
+          alt="TLTVB"
+          sx={{ height: 1, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
+        />
+        <Typography
+          component="span"
+          sx={{
+            fontSize: '1em',
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            color: '#6e6e6e',
+            lineHeight: 1,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          TLTVB
+        </Typography>
+      </Box>
     );
-
 
     if (disabledLink) {
       return <>{logo}</>;

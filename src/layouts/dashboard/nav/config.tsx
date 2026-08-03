@@ -28,10 +28,10 @@ const navConfig = [
     ],
   },
   {
-    subheader: 'Kết nối liên thông',
+    subheader: 'Quản lý đơn vị kết nối',
     items: [
       {
-        title: 'Kết nối liên thông',
+        title: 'Quản lý đơn vị kết nối',
         path: PATH_DASHBOARD.integration,
         icon: ICONS.ecommerce,
       },

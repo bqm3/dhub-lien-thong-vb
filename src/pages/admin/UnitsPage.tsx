@@ -154,7 +154,7 @@ export default function UnitsPage() {
         <MetricCard
           label="Đang hoạt động"
           value={rows.filter((u) => u.status === 'Active').length}
-          helper="Kết nối liên thông theo đơn vị"
+          helper="Quản lý đơn vị kết nối theo đơn vị"
           icon="solar:shield-check-bold"
         />
         <MetricCard

@@ -1,0 +1,18 @@
+{
+  "code": "VB-2026-281900",
+  "title": "dsad",
+  "type": "CONG_VAN",
+  "sender": "sdasd",
+  "receiver": "sdasd",
+  "version": "v1",
+  "classification": "Thường",
+  "status": "Đang xử lý",
+  "createdAt": "11:18:01 28/07/2026",
+  "attachments": [
+    "dac-ta-nghiep-vu.docx",
+    "Update-version-Dev-Test-Gtel-Vix.xlsx"
+  ],
+  "signProvider": "USB Token / HSM",
+  "signStatus": "Chưa ký",
+  "signedPositions": 0
+}

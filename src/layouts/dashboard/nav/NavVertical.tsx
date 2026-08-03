@@ -51,6 +51,7 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
     >
       <Stack
         spacing={3}
+        alignItems="center"
         sx={{
           pt: 2,
           pb: 1,

@@ -1,0 +1,19 @@
+{
+  "code": "VB-2026-281900",
+  "title": "dsad",
+  "type": "CONG_VAN",
+  "sender": "sdasd",
+  "receiver": "sdasd",
+  "version": "v1",
+  "classification": "Thường",
+  "status": "Đang xử lý",
+  "createdAt": "11:18:01 28/07/2026",
+  "attachments": [
+    "dac-ta-nghiep-vu.docx",
+    "Update-version-Dev-Test-Gtel-Vix.xlsx",
+    "https://minio.cdsdservice.com/api/v1/download-shared-object/aHR0cHM6Ly9zMy5jZHNkc2VydmljZS5jb20vZGF0YWNyYWZ0L2JhY2tncm91bmQucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9MDlPVlo5WllRSUJaNEE5VEREVkMlMkYyMDI2MDcyOCUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNjA3MjhUMDQ0NjIzWiZYLUFtei1FeHBpcmVzPTQzMjAwJlgtQW16LVNlY3VyaXR5LVRva2VuPWV5SmhiR2NpT2lKSVV6VXhNaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpoWTJObGMzTkxaWGtpT2lJd09VOVdXamxhV1ZGSlFsbzBRVGxVUkVSV1F5SXNJbVY0Y0NJNk1UYzROVEkxTnpBNE5pd2ljR0Z5Wlc1MElqb2lZV1J0YVc0aWZRLjdGM1NBQUdqOEdPR0NqeVV5cXlwUk0xQzRWRDhuRWNnVFlJak1xTGhDRFVrdVdPazFpRmw4TWlGR1BMdms1azRHWVZuVHpVSW1zd0FMZk1LTUVnS1ZRJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZ2ZXJzaW9uSWQ9bnVsbCZYLUFtei1TaWduYXR1cmU9MTk0YTMxODc2NzM0ZjFhMjYzNGI4MzMxZDI5NTIyNmJlYzYwZWQxOWVmZjMxZTUzMTgzMThjNDlhMWJkMTEyYw"
+  ],
+  "signProvider": "USB Token / HSM",
+  "signStatus": "Chưa ký",
+  "signedPositions": 0
+}

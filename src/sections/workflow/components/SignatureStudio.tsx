@@ -62,11 +62,13 @@ export default function SignatureStudio({
   fileName,
   fileUrl,
   files,
+  previewOnly = false,
   onSignComplete,
 }: {
   fileName?: string;
   fileUrl?: string;
   files?: { fileName: string; fileUrl?: string }[];
+  previewOnly?: boolean;
   onSignComplete?: (signatures: PlacedSignature[]) => void;
 }) {
   const theme = useTheme();
@@ -531,7 +533,7 @@ export default function SignatureStudio({
         overflow: 'hidden',
         bgcolor: 'common.white',
         maxWidth: `${PDF_BASE_WIDTH}px`,
-        cursor: signatureLink ? (isDragging ? 'grabbing' : 'crosshair') : 'default',
+        cursor: !previewOnly && signatureLink ? (isDragging ? 'grabbing' : 'crosshair') : 'default',
       }}
     >
       <Document
@@ -560,7 +562,10 @@ export default function SignatureStudio({
           width={PDF_BASE_WIDTH * scale}
           scale={scale}
           onLoadSuccess={handlePageLoadSuccess}
-          onClick={(event: React.MouseEvent) => handleDocumentClick(event, currentPage)}
+          onClick={(event: React.MouseEvent) => {
+            if (previewOnly) return;
+            handleDocumentClick(event, currentPage);
+          }}
           loading={
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, p: 4 }}>
               <CircularProgress size={40} />
@@ -570,7 +575,7 @@ export default function SignatureStudio({
           renderTextLayer={false}
           renderAnnotationLayer={false}
         />
-        {renderPositionMarker()}
+        {!previewOnly && renderPositionMarker()}
       </Document>
     </Box>
   );
@@ -578,7 +583,10 @@ export default function SignatureStudio({
   const renderImageViewer = () => (
     <Box
       ref={pageRef}
-      onClick={(event) => handleDocumentClick(event, 1)}
+      onClick={(event) => {
+        if (previewOnly) return;
+        handleDocumentClick(event, 1);
+      }}
       sx={{
         position: 'relative',
         boxShadow: 3,
@@ -586,7 +594,7 @@ export default function SignatureStudio({
         overflow: 'hidden',
         bgcolor: 'common.white',
         maxWidth: `${PDF_BASE_WIDTH * scale}px`,
-        cursor: signatureLink ? (isDragging ? 'grabbing' : 'crosshair') : 'default',
+        cursor: !previewOnly && signatureLink ? (isDragging ? 'grabbing' : 'crosshair') : 'default',
       }}
     >
       <img
@@ -599,7 +607,7 @@ export default function SignatureStudio({
           height: 'auto',
         }}
       />
-      {renderPositionMarker()}
+      {!previewOnly && renderPositionMarker()}
     </Box>
   );
 
@@ -619,65 +627,69 @@ export default function SignatureStudio({
           }}
         >
           <Typography variant="h6" color="primary.main">
-            Chữ ký của bạn
+            {previewOnly ? 'File đính kèm' : 'Chữ ký của bạn'}
           </Typography>
 
-          <Alert severity="info" icon={<Iconify icon="solar:info-circle-bold" width={20} />}>
-            Click vào vị trí bạn muốn đặt chữ ký trên tài liệu. Sau đó có thể kéo thả để di chuyển chữ ký đến vị trí mong muốn.
-          </Alert>
+          {!previewOnly && (
+            <>
+              <Alert severity="info" icon={<Iconify icon="solar:info-circle-bold" width={20} />}>
+                Click vào vị trí bạn muốn đặt chữ ký trên tài liệu. Sau đó có thể kéo thả để di chuyển chữ ký đến vị trí mong muốn.
+              </Alert>
 
-          {signatureLink && (
-            <Box
-              sx={{
-                width: '100%',
-                height: 120,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: 'common.white',
-                borderRadius: 2,
-                boxShadow: 1,
-              }}
-            >
-              <img
-                src={signatureLink}
-                alt="Chữ ký"
-                style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }}
-              />
-            </Box>
+              {signatureLink && (
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: 120,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'common.white',
+                    borderRadius: 2,
+                    boxShadow: 1,
+                  }}
+                >
+                  <img
+                    src={signatureLink}
+                    alt="Chữ ký"
+                    style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }}
+                  />
+                </Box>
+              )}
+
+              <Button
+                component="label"
+                variant="outlined"
+                disabled={isUploading}
+                fullWidth
+                startIcon={<Iconify icon="solar:upload-bold" />}
+              >
+                {signatureLink ? 'Cập nhật chữ ký' : 'Tải lên chữ ký'}
+                <input hidden type="file" accept="image/*" onChange={handleSignatureUpload} />
+              </Button>
+
+              <Button
+                component="label"
+                variant="outlined"
+                fullWidth
+                startIcon={<Iconify icon="solar:document-bold" />}
+              >
+                Chọn file văn bản
+                <input hidden type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple onChange={handleDocumentUpload} />
+              </Button>
+            </>
           )}
-
-          <Button
-            component="label"
-            variant="outlined"
-            disabled={isUploading}
-            fullWidth
-            startIcon={<Iconify icon="solar:upload-bold" />}
-          >
-            {signatureLink ? 'Cập nhật chữ ký' : 'Tải lên chữ ký'}
-            <input hidden type="file" accept="image/*" onChange={handleSignatureUpload} />
-          </Button>
-
-          <Button
-            component="label"
-            variant="outlined"
-            fullWidth
-            startIcon={<Iconify icon="solar:document-bold" />}
-          >
-            Chọn file văn bản
-            <input hidden type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple onChange={handleDocumentUpload} />
-          </Button>
 
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Danh sách văn bản ({fileList.length})
+              Danh sách file ({fileList.length})
             </Typography>
             {fileList.length === 0 ? (
               <Typography variant="caption" color="text.secondary">
-                Chưa có file upload.
+                Chưa có file.
               </Typography>
             ) : (
-              <Stack spacing={1} sx={{ maxHeight: 220, overflowY: 'auto' }}>
+              <Stack spacing={1} sx={{ maxHeight: previewOnly ? 420 : 220, overflowY: 'auto' }}>
                 {fileList.map((item) => {
                   const isOpen = openTabIds.indexOf(item.id) !== -1;
                   const isActive = item.id === activeFileId;
@@ -732,10 +744,8 @@ export default function SignatureStudio({
               <br />
               Trang {currentPage}/{totalPages || 1}
               <br />
-              Kích thước: {Math.round(pageDimensions.width)} x {Math.round(pageDimensions.height)}px
-              <br />
               Tỷ lệ: {Math.round(scale * 100)}%
-              {positionsList.length > 0 && (
+              {!previewOnly && positionsList.length > 0 && (
                 <>
                   <br />
                   Chữ ký đã đặt: {positionsList.length}
@@ -927,14 +937,17 @@ export default function SignatureStudio({
               />
             )}
 
-            <Button
-              variant="contained"
-              disabled={!signatureLink || positionsList.length === 0}
-              onClick={handleConfirm}
-              startIcon={<Iconify icon="solar:shield-check-bold" />}
-            >
-              Xác nhận ký số
-            </Button>
+            {!previewOnly && (
+              <Button
+                variant="contained"
+                disabled={!signatureLink || positionsList.length === 0}
+                onClick={handleConfirm}
+                startIcon={<Iconify icon="solar:shield-check-bold" />}
+              >
+                Xác nhận ký số
+              </Button>
+            )}
+            {previewOnly && <Box sx={{ width: 120 }} />}
           </Box>
         </Box>
       </Grid>

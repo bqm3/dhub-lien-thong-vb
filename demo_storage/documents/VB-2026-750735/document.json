@@ -1,0 +1,17 @@
+{
+  "code": "VB-2026-750735",
+  "title": "đasa",
+  "type": "CONG_VAN",
+  "sender": "4223",
+  "receiver": "442",
+  "version": "v1",
+  "classification": "Thường",
+  "status": "Đang xử lý",
+  "createdAt": "11:42:30 28/07/2026",
+  "attachments": [
+    "https://docs.google.com/document/d/1LGqzttJLzTdOZuIThTVRplddoUpmBeAx/edit"
+  ],
+  "signProvider": "USB Token / HSM",
+  "signStatus": "Chưa ký",
+  "signedPositions": 0
+}

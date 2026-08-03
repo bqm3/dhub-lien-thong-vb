@@ -22,7 +22,8 @@ export default function LoginLayout({ children }: Props) {
           position: 'absolute',
           mt: { xs: 1.5, md: 5 },
           ml: { xs: 2, md: 5 },
-          height: 36
+          height: 40,
+          fontSize: 40,
         }}
       />
 
@@ -120,7 +121,7 @@ export default function LoginLayout({ children }: Props) {
                 icon: 'eva:cube-fill',
                 color: '#16A34A',
                 bg: 'rgba(22, 163, 74, 0.1)',
-                title: 'Kết nối liên thông',
+                title: 'Quản lý đơn vị kết nối',
                 desc: 'Tích hợp đồng bộ với hệ thống quản lý văn bản của từng bộ, ngành',
               },
               {

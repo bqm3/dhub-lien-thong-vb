@@ -290,7 +290,7 @@ export default function IntegrationManagementPage() {
 
       {/* Main tabs */}
       <SectionCard
-        title="Quản lý kết nối"
+        title="Quản lý đơn vị kết nối"
         subtitle="Chọn nhóm chức năng để xem và thao tác."
         // action={
         //   <Button variant="contained" startIcon={<Iconify icon="solar:user-plus-bold" />} onClick={handleOpenCreate}>

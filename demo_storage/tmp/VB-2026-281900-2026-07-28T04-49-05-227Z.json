@@ -1,0 +1,19 @@
+{
+  "code": "VB-2026-281900",
+  "title": "dsad",
+  "type": "CONG_VAN",
+  "sender": "sdasd",
+  "receiver": "sdasd",
+  "version": "v1",
+  "classification": "Thường",
+  "status": "Đang xử lý",
+  "createdAt": "11:18:01 28/07/2026",
+  "attachments": [
+    "dac-ta-nghiep-vu.docx",
+    "Update-version-Dev-Test-Gtel-Vix.xlsx",
+    "https://s3.pmcweb.vn/pheduyetonl/files_contract/Sai_Gon_Mia/19/20260612_142902_Reviewed_SG_MIA_Hop_ong_Cung_cap_vat_tu_ky_thuat.docx?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Gna4Y8BQXqXdsRQnAo0C%2F20260728%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260728T043321Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=c87dcd903d860daae654bc99f2fbd45aca2512c976af039139b7f84cf9bfac11"
+  ],
+  "signProvider": "USB Token / HSM",
+  "signStatus": "Chưa ký",
+  "signedPositions": 0
+}
