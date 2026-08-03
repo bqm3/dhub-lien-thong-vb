@@ -4,7 +4,7 @@ import { PATH_DASHBOARD } from './routes/paths';
 // API
 // ----------------------------------------------------------------------
 
-export const HOST_API_KEY = import.meta.env.REACT_APP_HOST_API_KEY || 'https://dev-api.tbs.gov.vn/api';
+export const HOST_API_KEY = import.meta.env.REACT_APP_HOST_API_KEY || 'http://localhost:8800/api';
 
 export const FIREBASE_API = {
   apiKey: import.meta.env.REACT_APP_FIREBASE_API_KEY,

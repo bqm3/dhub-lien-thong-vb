@@ -547,14 +547,14 @@ export default function DocumentExchangePage() {
                     )}
                     {detailTx.errorReason === 'Routing Error' && (
                       <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Vào <strong>Quản lý đơn vị kết nối</strong> → tab <strong>Endpoint</strong> để kiểm tra cấu hình route.</Typography>
+                        <Typography variant="body2">1. Vào <strong>Kết nối liên thông</strong> → tab <strong>Endpoint</strong> để kiểm tra cấu hình route.</Typography>
                         <Typography variant="body2">2. Cập nhật đúng agencyCode và endpoint URL cho đơn vị nhận.</Typography>
                         <Typography variant="body2">3. Bấm <strong>Replay</strong> sau khi route đã được sửa.</Typography>
                       </Stack>
                     )}
                     {detailTx.errorReason === 'Auth Failed' && (
                       <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Vào <strong>Quản lý đơn vị kết nối</strong> → tab <strong>API Key</strong> hoặc <strong>Credential</strong>.</Typography>
+                        <Typography variant="body2">1. Vào <strong>Kết nối liên thông</strong> → tab <strong>API Key</strong> hoặc <strong>Credential</strong>.</Typography>
                         <Typography variant="body2">2. Cấp lại API Key hoặc renew certificate cho đơn vị liên quan.</Typography>
                         <Typography variant="body2">3. Bấm <strong>Replay</strong> sau khi thông tin xác thực đã cập nhật.</Typography>
                       </Stack>

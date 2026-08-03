@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -14,38 +14,25 @@ import {
   Typography,
 } from '@mui/material';
 import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
+import { dmCategoryApi, DMCategoryItem, getDefaultDateRange } from '../../services/dmCategoryApi';
 
 type RoleRecord = {
   code: string;
+  numericId?: number;
   name: string;
+  parentCode: string;
   scope: 'Hệ thống' | 'Đơn vị';
   status: 'Active' | 'Inactive';
   permissions: string[];
   updatedAt: string;
 };
 
-const initialRoles: RoleRecord[] = [
-  {
-    code: 'ADMIN',
-    name: 'Quản trị hệ thống',
-    scope: 'Hệ thống',
-    status: 'Active',
-    permissions: ['ADMIN_MANAGE', 'DOC_MANAGE', 'WF_MANAGE', 'EXCHANGE_MANAGE'],
-    updatedAt: '25/06/2026 08:00',
-  },
-  {
-    code: 'AGENCY',
-    name: 'Đơn vị',
-    scope: 'Đơn vị',
-    status: 'Active',
-    permissions: ['DOC_MANAGE', 'WF_MANAGE', 'EXCHANGE_MANAGE'],
-    updatedAt: '28/06/2026 10:15',
-  },
-];
+const DEFAULT_PARENT_CODE = 'VAI_TRO';
 
 const emptyForm: RoleRecord = {
   code: '',
   name: '',
+  parentCode: DEFAULT_PARENT_CODE,
   scope: 'Đơn vị',
   status: 'Active',
   permissions: [],
@@ -60,12 +47,52 @@ const permissionCatalog = [
 ];
 
 export default function RolesPage() {
-  const [rows, setRows] = useState<RoleRecord[]>(initialRoles);
+  const defaultDates = useMemo(() => getDefaultDateRange(), []);
+  const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
+  const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
+  const [parentCodeFilter, setParentCodeFilter] = useState(DEFAULT_PARENT_CODE);
+
+  const [rows, setRows] = useState<RoleRecord[]>([]);
+  const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [openEditor, setOpenEditor] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<RoleRecord>(emptyForm);
   const [deletingCode, setDeletingCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchRoles();
+  }, [cdateStart, cdateEnd, parentCodeFilter]);
+
+  async function fetchRoles() {
+    setLoading(true);
+    try {
+      const res = await dmCategoryApi.getList({
+        pageIndex: 1,
+        pageSize: 200,
+        cdateStart,
+        cdateEnd,
+        searchField: parentCodeFilter ? { PARENT_CODE: parentCodeFilter } : {},
+      });
+      if (res.data) {
+        const mapped: RoleRecord[] = res.data.map((item) => ({
+          code: item.code,
+          numericId: item.id,
+          name: item.name,
+          parentCode: item.parentCode || parentCodeFilter,
+          scope: 'Đơn vị',
+          status: item.isActive === 1 ? 'Active' : 'Inactive',
+          permissions: ['DOC_MANAGE', 'EXCHANGE_MANAGE'],
+          updatedAt: item.cdate || new Date().toLocaleDateString('vi-VN'),
+        }));
+        setRows(mapped);
+      }
+    } catch (err) {
+      console.warn('API error fetching roles', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -112,6 +139,7 @@ export default function RolesPage() {
     setFormValues({
       ...emptyForm,
       code: `ROLE_${String(Date.now()).slice(-6)}`,
+      parentCode: parentCodeFilter || DEFAULT_PARENT_CODE,
       updatedAt: new Date().toLocaleString('vi-VN'),
     });
     setOpenEditor(true);
@@ -133,21 +161,40 @@ export default function RolesPage() {
     });
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!formValues.code || !formValues.name) return;
-    const payload: RoleRecord = { ...formValues, updatedAt: new Date().toLocaleString('vi-VN') };
 
-    if (editingCode) {
-      setRows((prev) => prev.map((item) => (item.code === editingCode ? payload : item)));
+    const apiItem: DMCategoryItem = {
+      id: formValues.numericId,
+      code: formValues.code,
+      name: formValues.name,
+      parentCode: formValues.parentCode || parentCodeFilter || DEFAULT_PARENT_CODE,
+      description: formValues.scope,
+      isActive: formValues.status === 'Active' ? 1 : 0,
+      status: 1,
+    };
+
+    const res = await dmCategoryApi.createOrUpdate(apiItem);
+    if (res.success) {
+      await fetchRoles();
+      setOpenEditor(false);
     } else {
-      setRows((prev) => [payload, ...prev]);
+      alert(`Lỗi API /DM_CATEGORY/Create: ${res.message}`);
     }
-
-    setOpenEditor(false);
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!deletingCode) return;
+    const target = rows.find((r) => r.code === deletingCode);
+
+    if (target?.numericId) {
+      const res = await dmCategoryApi.delete(target.numericId);
+      if (!res.success) {
+        alert(`Lỗi xóa API: ${res.message}`);
+        return;
+      }
+    }
+
     setRows((prev) => prev.filter((item) => item.code !== deletingCode));
     setDeletingCode(null);
   }
@@ -155,19 +202,19 @@ export default function RolesPage() {
   return (
     <PageShell
       title="Vai trò / Phân quyền"
-      subtitle="Quản lý 2 vai trò: Admin (hệ thống) và Đơn vị. CRUD bằng popup modal."
+      subtitle="Quản lý vai trò, phân quyền truy cập. Lọc và lưu mặc định PARENT_CODE = VAI_TRO."
     >
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
         <MetricCard
           label="Tổng vai trò"
           value={rows.length}
-          helper="Dữ liệu demo (local state)"
+          helper={`Filter PARENT_CODE: ${parentCodeFilter}`}
           icon="solar:user-id-bold"
         />
         <MetricCard
           label="Đang active"
           value={rows.filter((r) => r.status === 'Active').length}
-          helper="Gán cho người dùng/đơn vị"
+          helper="Gán cho người dùng"
           icon="solar:shield-check-bold"
         />
         <MetricCard
@@ -185,39 +232,73 @@ export default function RolesPage() {
       </GridRow>
 
       <SectionCard
-            title="Danh sách vai trò"
-            subtitle="Tách riêng giao diện role/permission; thêm/sửa/xóa bằng modal."
-            action={
-              <Button variant="contained" onClick={handleOpenCreate}>
-                Thêm vai trò
-              </Button>
-            }
-          >
-            <Stack spacing={2}>
-              <TextField
-                size="small"
-                label="Tìm kiếm"
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-                placeholder="Mã, tên, scope, permission"
-              />
+        title="Danh sách vai trò"
+        subtitle="Tách riêng giao diện role/permission; thêm/sửa/xóa bằng modal."
+        action={
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={fetchRoles} disabled={loading}>
+              {loading ? 'Đang tải...' : 'Làm mới (API)'}
+            </Button>
+            <Button variant="contained" onClick={handleOpenCreate}>
+              Thêm vai trò
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+            <TextField
+              size="small"
+              label="Tìm kiếm"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="Mã, tên, scope, permission"
+              sx={{ flex: 1 }}
+            />
+            <TextField
+              size="small"
+              label="Mã nhóm (PARENT_CODE)"
+              value={parentCodeFilter}
+              onChange={(e) => setParentCodeFilter(e.target.value)}
+              placeholder="Mặc định VAI_TRO"
+              sx={{ minWidth: 200 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Từ ngày (CDATE_START)"
+              InputLabelProps={{ shrink: true }}
+              value={cdateStart}
+              onChange={(e) => setCdateStart(e.target.value)}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Đến ngày (CDATE_END)"
+              InputLabelProps={{ shrink: true }}
+              value={cdateEnd}
+              onChange={(e) => setCdateEnd(e.target.value)}
+              sx={{ minWidth: 160 }}
+            />
+          </Stack>
 
-              <Box sx={{ overflowX: 'auto' }}>
-                <DataTable
-                  columns={[
-                    { key: 'code', label: 'Mã' },
-                    { key: 'name', label: 'Tên vai trò' },
-                    { key: 'scope', label: 'Scope', align: 'center' },
-                    { key: 'permissions', label: 'Permissions' },
-                    { key: 'status', label: 'Trạng thái', align: 'center' },
-                    { key: 'updatedAt', label: 'Cập nhật', align: 'center' },
-                    { key: 'actions', label: 'Thao tác', align: 'right' },
-                  ]}
-                  rows={tableRows}
-                />
-              </Box>
-            </Stack>
-          </SectionCard>
+          <Box sx={{ overflowX: 'auto' }}>
+            <DataTable
+              columns={[
+                { key: 'code', label: 'Mã' },
+                { key: 'name', label: 'Tên vai trò' },
+                { key: 'scope', label: 'Scope', align: 'center' },
+                { key: 'permissions', label: 'Permissions' },
+                { key: 'status', label: 'Trạng thái', align: 'center' },
+                { key: 'updatedAt', label: 'Cập nhật', align: 'center' },
+                { key: 'actions', label: 'Thao tác', align: 'right' },
+              ]}
+              rows={tableRows}
+            />
+          </Box>
+        </Stack>
+      </SectionCard>
 
       <Dialog open={openEditor} onClose={() => setOpenEditor(false)} fullWidth maxWidth="md">
         <DialogTitle>{editingCode ? 'Cập nhật vai trò' : 'Tạo mới vai trò'}</DialogTitle>
@@ -229,12 +310,18 @@ export default function RolesPage() {
                 label="Mã"
                 disabled={Boolean(editingCode)}
                 value={formValues.code}
-                onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, code: event.target.value }))
-                }
+                onChange={(event) => setFormValues((prev) => ({ ...prev, code: event.target.value }))}
               />
             </Grid>
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="PARENT_CODE (Nhóm vai trò)"
+                value={formValues.parentCode}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, parentCode: event.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
                 label="Tên vai trò"
@@ -320,4 +407,3 @@ export default function RolesPage() {
     </PageShell>
   );
 }
-
