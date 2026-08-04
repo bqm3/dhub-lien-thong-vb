@@ -15,7 +15,7 @@ export interface DocSendHeader {
   sender_Code: string;
   receiver_Code: string[];
   priority: string;
-  issue_Date: string; // "yyyy-MM-dd" or "yyyy-MM-dd HH:mm:ss"
+  issue_Date: string;
 }
 
 export interface DocSendRequest {
@@ -32,16 +32,7 @@ export interface DocReceiveRequest {
 export interface DocACKRequest {
   document_Id: string;
   receiver_Code: string;
-  status: string; // "ACK" | "NACK" | "WAITING"
-}
-
-export interface DipHubResponse {
-  resultCode: number | string;
-  ResultCode?: number | string;
-  message: string;
-  Message?: string;
-  timestamp?: number;
-  data?: any;
+  status: string;
 }
 
 /**
@@ -51,97 +42,49 @@ export const dipHubApi = {
   /**
    * Gửi văn bản liên thông (Send Service)
    */
-  async sendDocument(request: DocSendRequest): Promise<DipHubResponse> {
-    try {
-      const response = await axiosInstance.post('/DIP_Hub/Send', {
-        Header: {
-          Document_No: request.header.document_No,
-          Document_Type: request.header.document_Type,
-          Subject: request.header.subject,
-          Sender_Code: request.header.sender_Code,
-          Receiver_Code: request.header.receiver_Code,
-          Priority: request.header.priority,
-          Issue_Date: request.header.issue_Date,
-        },
-        Body: request.body.map((b) => ({
-          File_Name: b.file_Name,
-          Data_Type: b.data_Type,
-          Content_Type: b.content_Type,
-          File_URL: b.file_URL,
-          Base64_Data: b.base64_Data,
-        })),
-      });
-      const resData = response.data || {};
-      return {
-        resultCode: resData.ResultCode !== undefined ? resData.ResultCode : resData.resultCode ?? 0,
-        ResultCode: resData.ResultCode,
-        message: resData.Message || resData.message || '',
-        Message: resData.Message,
-        timestamp: resData.Timestamp || resData.timestamp,
-        data: resData.Data || resData.data,
-      };
-    } catch (error: any) {
-      console.warn('Backend /DIP_Hub/Send API unavailable.', error);
-      return {
-        resultCode: 0,
-        message: typeof error === 'string' ? error : 'Gửi văn bản thất bại hoặc mất kết nối máy chủ',
-      };
-    }
+  async sendDocument(request: DocSendRequest) {
+    const response = await axiosInstance.post('/DIP_Hub/Send', {
+      Header: {
+        Document_No: request.header.document_No,
+        Document_Type: request.header.document_Type,
+        Subject: request.header.subject,
+        Sender_Code: request.header.sender_Code,
+        Receiver_Code: request.header.receiver_Code,
+        Priority: request.header.priority,
+        Issue_Date: request.header.issue_Date,
+      },
+      Body: request.body.map((b) => ({
+        File_Name: b.file_Name,
+        Data_Type: b.data_Type,
+        Content_Type: b.content_Type,
+        File_URL: b.file_URL,
+        Base64_Data: b.base64_Data,
+      })),
+    });
+    return response.data;
   },
 
   /**
    * Tiếp nhận văn bản liên thông (Receive Service)
    */
-  async receiveDocument(request: DocReceiveRequest): Promise<DipHubResponse> {
-    try {
-      const response = await axiosInstance.post('/DIP_Hub/Receive', {
-        Document_Id: request.document_Id,
-        Sender_Code: request.sender_Code,
-        Receiver_Code: request.receiver_Code,
-      });
-      const resData = response.data || {};
-      return {
-        resultCode: resData.ResultCode !== undefined ? resData.ResultCode : resData.resultCode ?? 0,
-        ResultCode: resData.ResultCode,
-        message: resData.Message || resData.message || '',
-        Message: resData.Message,
-        timestamp: resData.Timestamp || resData.timestamp,
-        data: resData.Data || resData.data,
-      };
-    } catch (error: any) {
-      console.warn('Backend /DIP_Hub/Receive API unavailable.', error);
-      return {
-        resultCode: 0,
-        message: typeof error === 'string' ? error : 'Tiếp nhận văn bản thất bại',
-      };
-    }
+  async receiveDocument(request: DocReceiveRequest) {
+    const response = await axiosInstance.post('/DIP_Hub/Receive', {
+      Document_Id: request.document_Id,
+      Sender_Code: request.sender_Code,
+      Receiver_Code: request.receiver_Code,
+    });
+    return response.data;
   },
 
   /**
    * Phản hồi / Xác nhận giao dịch (ACK Service)
    */
-  async ackDocument(request: DocACKRequest): Promise<DipHubResponse> {
-    try {
-      const response = await axiosInstance.post('/DIP_Hub/Ack', {
-        Document_Id: request.document_Id,
-        Receiver_Code: request.receiver_Code,
-        Status: request.status,
-      });
-      const resData = response.data || {};
-      return {
-        resultCode: resData.ResultCode !== undefined ? resData.ResultCode : resData.resultCode ?? 0,
-        ResultCode: resData.ResultCode,
-        message: resData.Message || resData.message || '',
-        Message: resData.Message,
-        timestamp: resData.Timestamp || resData.timestamp,
-        data: resData.Data || resData.data,
-      };
-    } catch (error: any) {
-      console.warn('Backend /DIP_Hub/Ack API unavailable.', error);
-      return {
-        resultCode: 0,
-        message: typeof error === 'string' ? error : 'Xác nhận ACK thất bại',
-      };
-    }
+  async ackDocument(request: DocACKRequest) {
+    const response = await axiosInstance.post('/DIP_Hub/Ack', {
+      Document_Id: request.document_Id,
+      Receiver_Code: request.receiver_Code,
+      Status: request.status,
+    });
+    return response.data;
   },
 };

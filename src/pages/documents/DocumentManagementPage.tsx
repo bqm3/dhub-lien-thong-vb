@@ -1,7 +1,6 @@
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { useSnackbar } from 'notistack';
+import { ChangeEvent, useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -12,338 +11,319 @@ import {
   Divider,
   Grid,
   IconButton,
-  ListItemIcon,
-  ListItemText,
-  Menu,
   MenuItem,
+  Paper,
   Stack,
-  Tab,
-  Tabs,
   TextField,
+  Tooltip,
   Typography,
+  alpha,
 } from '@mui/material';
-import {
-  DocumentRecord,
-  documentLifecycle,
-  documents,
-} from '../../sections/interoperability/mockData';
 import {
   DataTable,
   GridRow,
   MetricCard,
   PageShell,
   SectionCard,
-  StatusChip,
 } from '../../sections/interoperability/components';
 import Iconify from '../../components/iconify';
-import SignatureStudio from '../../sections/workflow/components/SignatureStudio';
+import { documentsApi, documentAttachmentsApi } from '../../services/documentsApi';
+import { dmCategoryApi } from '../../services/dmCategoryApi';
+import { getDefaultDateRange } from '../../services/getDefaultDateRange';
+import { formatTime } from '../../utils/formatTime';
+import { isApiSuccess } from '../../utils/axios';
+import useLoading from '../../hooks/useLoading';
 
-type ManagedDocumentRecord = DocumentRecord & {
-  attachments: string[];
-  signProvider: string;
-  signStatus: string;
-  signedPositions: number;
+export type ManagedDocumentRecord = {
+  numericId?: number;
+  id?: number;
+  code: string;           // CODE
+  messageId?: string;      // MESSAGE_ID
+  documentNo: string;      // DOCUMENT_NO
+  documentType: string;    // DOCUMENT_TYPE
+  subject: string;         // SUBJECT
+  senderCode: string;      // SENDER_CODE
+  senderName: string;      // SENDER_NAME
+  status: string;          // STATUS
+  createdAt: string;       // CDATE
+  attachments?: {
+    id?: number;
+    originalFileName: string;
+    objectKey: string;
+    fileSize?: number;
+    contentType?: string;
+  }[];
 };
-
-function DocumentActionsMenu({
-  onDetail,
-  onEdit,
-  onDelete,
-}: {
-  onDetail: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
-
-  function closeMenu() {
-    setAnchorEl(null);
-  }
-
-  return (
-    <>
-      <IconButton size="small" onClick={(event) => setAnchorEl(event.currentTarget)}>
-        <Iconify icon="eva:more-vertical-fill" width={18} />
-      </IconButton>
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={closeMenu}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <MenuItem
-          onClick={() => {
-            onDetail();
-            closeMenu();
-          }}
-        >
-          <ListItemIcon>
-            <Iconify icon="solar:eye-bold" width={18} />
-          </ListItemIcon>
-          <ListItemText primary="Chi tiết" />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            onEdit();
-            closeMenu();
-          }}
-        >
-          <ListItemIcon>
-            <Iconify icon="solar:pen-bold" width={18} />
-          </ListItemIcon>
-          <ListItemText primary="Sửa" />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            onDelete();
-            closeMenu();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <ListItemIcon>
-            <Iconify icon="solar:trash-bin-trash-bold" width={18} sx={{ color: 'error.main' }} />
-          </ListItemIcon>
-          <ListItemText primary="Xóa" />
-        </MenuItem>
-      </Menu>
-    </>
-  );
-}
 
 const emptyDocumentForm: ManagedDocumentRecord = {
   code: '',
-  title: '',
-  type: 'CONG_VAN',
-  sender: '',
-  receiver: '',
-  version: 'v1',
-  classification: 'Thường',
-  status: 'Đang xử lý',
-  createdAt: '02/07/2026 09:00',
-  attachments: [],
-  signProvider: 'USB Token / HSM',
-  signStatus: 'Chưa ký',
-  signedPositions: 0,
+  documentNo: '',
+  documentType: '',
+  subject: '',
+  senderCode: '',
+  senderName: '',
+  status: '1',
+  createdAt: formatTime(new Date()),
 };
 
-const DOC_TYPES = ['', 'CONG_VAN', 'QUYET_DINH', 'BAO_CAO', 'THONG_BAO', 'KE_HOACH', 'BIEN_NHAN'];
-
-const initialDocuments: ManagedDocumentRecord[] = documents.map((doc, index) => ({
-  ...doc,
-  attachments: [
-    `${doc.code.toLowerCase()}.pdf`,
-    `phu-luc-${index + 1}.docx`,
-  ],
-  signProvider: index % 3 === 0 ? 'VNPT SmartCA' : 'USB Token / HSM',
-  signStatus: doc.status === 'Đã phát hành' ? 'Đã ký số' : index % 2 === 0 ? 'Đang chờ ký' : 'Chưa ký',
-  signedPositions: doc.status === 'Đã phát hành' ? 2 : index % 2 === 0 ? 1 : 0,
-}));
-
-function pad2(value: number) {
-  return value < 10 ? `0${value}` : String(value);
-}
-
-function formatDocumentDate(input: Date | number | string) {
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) return String(input);
-
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())} ${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
-}
-
-function normalizeManagedDocument(input: Partial<ManagedDocumentRecord>): ManagedDocumentRecord | null {
-  if (!input.code || !input.title || !input.sender || !input.receiver) return null;
-
-  const normalizedCreatedAt = input.createdAt
-    ? formatDocumentDate(parseDocumentDate(String(input.createdAt)))
-    : formatDocumentDate(new Date());
-
-  return {
-    code: String(input.code),
-    title: String(input.title),
-    type: String(input.type ?? 'CONG_VAN'),
-    sender: String(input.sender),
-    receiver: String(input.receiver),
-    version: String(input.version ?? 'v1'),
-    classification: String(input.classification ?? 'Thường'),
-    status: String(input.status ?? 'Đang xử lý'),
-    createdAt: normalizedCreatedAt,
-    attachments: Array.isArray(input.attachments) ? input.attachments.map((x) => String(x)) : [],
-    signProvider: String(input.signProvider ?? 'USB Token / HSM'),
-    signStatus: String(input.signStatus ?? 'Chưa ký'),
-    signedPositions: Number.isFinite(input.signedPositions) ? Number(input.signedPositions) : 0,
-  };
-}
-
-function parseDocumentDate(value: string) {
-  const trimmed = value.trim();
-  const isoTime = Date.parse(trimmed);
-  if (!Number.isNaN(isoTime)) return isoTime;
-
-  const match = trimmed.match(
-    /^(?:(\d{1,2}):(\d{2})(?::(\d{2}))?[,\s]+)?(\d{1,2})\/(\d{1,2})\/(\d{4})$|^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
-  if (!match) return 0;
-
-  if (match[1] || match[4]) {
-    const [, hh = '0', min = '0', ss = '0', dd = '1', mm = '1', yyyy = '1970'] = match;
-    return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss)).getTime();
+function getFileExtensionInfo(filename: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  if (['pdf'].includes(ext)) {
+    return { icon: 'solar:file-corrupted-bold', color: '#e53935', bg: 'rgba(229, 57, 53, 0.1)', label: 'PDF' };
   }
-
-  const [, , , , , , dd = '1', mm = '1', yyyy = '1970', hh = '0', min = '0', ss = '0'] = match;
-  return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss)).getTime();
-}
-
-function fakeVersions(doc: ManagedDocumentRecord) {
-  const n = parseInt(doc.version.replace('v', ''), 10);
-  return Array.from({ length: n }, (_, i) => ({
-    version: `v${i + 1}`,
-    changedBy: i === 0 ? doc.sender : 'Hệ thống',
-    changedAt: doc.createdAt,
-    note: i === 0 ? 'Tạo mới' : `Cập nhật lần ${i}`,
-  }));
-}
-
-function fakeAudit(doc: ManagedDocumentRecord) {
-  return [
-    { action: 'Tạo mới', actor: doc.sender, time: doc.createdAt, detail: `Khởi tạo văn bản ${doc.code}` },
-    { action: 'Tải tệp', actor: doc.sender, time: doc.createdAt, detail: `${doc.attachments.length} tệp đính kèm đã được thêm vào hồ sơ` },
-    {
-      action: 'Ký số',
-      actor: doc.sender,
-      time: doc.createdAt,
-      detail: `${doc.signStatus} qua ${doc.signProvider}`,
-    },
-    { action: 'Phát hành', actor: doc.sender, time: doc.createdAt, detail: `Chuyển trạng thái sang ${doc.status}` },
-    { action: 'Gửi liên thông', actor: 'Hệ thống', time: doc.createdAt, detail: `Điểm đến ${doc.receiver}` },
-  ];
+  if (['doc', 'docx'].includes(ext)) {
+    return { icon: 'solar:file-word-bold', color: '#1976d2', bg: 'rgba(25, 118, 210, 0.1)', label: 'DOCX' };
+  }
+  if (['xls', 'xlsx'].includes(ext)) {
+    return { icon: 'solar:file-excel-bold', color: '#2e7d32', bg: 'rgba(46, 125, 50, 0.1)', label: 'XLSX' };
+  }
+  if (['zip', 'rar', '7z'].includes(ext)) {
+    return { icon: 'solar:archive-bold', color: '#ed6c02', bg: 'rgba(237, 108, 2, 0.1)', label: ext.toUpperCase() };
+  }
+  return { icon: 'solar:file-text-bold', color: '#0288d1', bg: 'rgba(2, 136, 209, 0.1)', label: ext.toUpperCase() || 'FILE' };
 }
 
 export default function DocumentManagementPage() {
-  const [documentList, setDocumentList] = useState<ManagedDocumentRecord[]>(initialDocuments);
+  const { showLoading, hideLoading } = useLoading();
+  const queryClient = useQueryClient();
+  const defaultDates = useMemo(() => getDefaultDateRange(), []);
+  const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
+  const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
+
+  // Pagination states
+  const [pageIndex, setPageIndex] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [keyword, setKeyword] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [openForm, setOpenForm] = useState(false);
-  const [openSignDialog, setOpenSignDialog] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ManagedDocumentRecord>(emptyDocumentForm);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [formAttachmentPreviewUrls, setFormAttachmentPreviewUrls] = useState<Record<string, string>>({});
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [detailDoc, setDetailDoc] = useState<ManagedDocumentRecord | null>(null);
-  const [detailTab, setDetailTab] = useState(0);
-  const [lifecycleExpanded, setLifecycleExpanded] = useState(false);
-  const { enqueueSnackbar } = useSnackbar();
 
-  useEffect(() => {
-    let mounted = true;
+  // TanStack Query: Fetch Document Types Category (PARENT_CODE = 'LOAI_VB')
+  const { data: docTypesCategory } = useQuery({
+    queryKey: ['docTypesCategory'],
+    queryFn: async () => {
+      const res = await dmCategoryApi.getList({
+        pageIndex: 1,
+        pageSize: 100,
+        searchField: { PARENT_CODE: 'LOAI_VB' },
+      });
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      if (!rawList || rawList.length === 0) return [];
+      return rawList.map((item: any) => ({
+        code: item.CODE || item.code || '',
+        name: item.NAME || item.name || item.CODE || item.code || '',
+      }));
+    },
+  });
 
-    async function loadSavedDocuments() {
-      try {
-        const resp = await fetch('/api/demo-documents');
-        if (!resp.ok) return;
-        const payload = await resp.json();
-        const savedDocsRaw = Array.isArray(payload?.documents) ? payload.documents : [];
-        const savedDocs: ManagedDocumentRecord[] = savedDocsRaw
-          .map((item: Partial<ManagedDocumentRecord>) => normalizeManagedDocument(item))
-          .filter((item: ManagedDocumentRecord | null): item is ManagedDocumentRecord => Boolean(item));
+  const docTypeOptions = docTypesCategory || [];
 
-        if (!mounted || savedDocs.length === 0) return;
+  // TanStack Query: Fetch Đơn vị phát hành (PARENT_CODE = 'DON_VI')
+  const { data: donViCategory } = useQuery({
+    queryKey: ['donViCategory'],
+    queryFn: async () => {
+      const res = await dmCategoryApi.getList({
+        pageIndex: 1,
+        pageSize: 200,
+        searchField: { PARENT_CODE: 'DON_VI' },
+      });
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      if (!rawList || rawList.length === 0) return [];
+      return rawList.map((item: any) => ({
+        code: item.CODE || item.code || '',
+        name: item.NAME || item.name || item.CODE || item.code || '',
+      }));
+    },
+  });
 
-        setDocumentList((prev) => {
-          const byCode = new Map<string, ManagedDocumentRecord>();
-          prev.forEach((doc) => byCode.set(doc.code, doc));
-          savedDocs.forEach((doc) => byCode.set(doc.code, doc));
-          return Array.from(byCode.values());
+  const donViOptions: { code: string; name: string }[] = donViCategory || [];
+
+  // TanStack Query: Fetch Documents from API (DOCUMENTSController)
+  const { data, isFetching, refetch } = useQuery<{ rows: ManagedDocumentRecord[]; total: number }>({
+    queryKey: ['documents', pageIndex, pageSize, cdateStart, cdateEnd, typeFilter],
+    queryFn: async () => {
+      const res = await documentsApi.getList({
+        pageIndex,
+        pageSize,
+        cdateStart,
+        cdateEnd,
+        searchField: typeFilter ? { DOCUMENT_TYPE: typeFilter } : {},
+      });
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      const total = res?.TotalRecords ?? res?.totalRecords ?? res?.TotalCount ?? res?.totalCount ?? (rawList ? rawList.length : 0);
+      if (!rawList) return { rows: [], total: 0 };
+      const mapped: ManagedDocumentRecord[] = rawList.map((item: any) => ({
+        numericId: item.ID || item.id,
+        id: item.ID || item.id,
+        code: item.CODE || item.code || '',
+        messageId: item.MESSAGE_ID || item.messageId || '',
+        documentNo: item.DOCUMENT_NO || item.documentNo || '',
+        documentType: item.DOCUMENT_TYPE || item.documentType || '',
+        subject: item.SUBJECT || item.subject || '',
+        senderCode: item.SENDER_CODE || item.senderCode || '',
+        senderName: item.SENDER_NAME || item.senderName || '',
+        status: String(item.STATUS ?? item.status ?? '1'),
+        createdAt: formatTime(item.CDATE || item.cdate || item.createdDate || item.CREATED_DATE),
+      }));
+      return { rows: mapped, total };
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  // TanStack Query: Fetch Detail & Attachments for Detail Dialog via DOCUMENTS/GetInfo/{id}
+  const { data: detailDocAttachments } = useQuery({
+    queryKey: ['documentAttachments', detailDoc?.numericId || detailDoc?.id],
+    enabled: Boolean(detailDoc?.numericId || detailDoc?.id),
+    queryFn: async () => {
+      const docId = detailDoc?.numericId || detailDoc?.id;
+      if (!docId) return [];
+      const res = await documentsApi.getInfo(docId);
+      const infoData = res?.Data || res?.data;
+      const list = infoData?.DOCUMENT_ATTACHMENT || infoData?.document_attachment || infoData?.DocumentAttachment || [];
+      return list.map((item: any) => ({
+        id: item.ID || item.id,
+        originalFileName: item.ORIGINAL_FILE_NAME || item.originalFileName || 'File_dinh_kem.pdf',
+        objectKey: item.OBJECT_KEY || item.objectKey || '',
+        fileSize: item.FILE_SIZE || item.fileSize || 0,
+        contentType: item.CONTENT_TYPE || item.contentType || 'application/pdf',
+      }));
+    },
+  });
+
+  const documentList = data?.rows || [];
+  const totalCount = data?.total || 0;
+
+  // TanStack Mutation: Save Document
+  const saveMutation = useMutation({
+    mutationFn: async (item: ManagedDocumentRecord) => {
+      if (!editingCode) {
+        // Tạo mới: dùng CreateBundle (multipart/form-data) — BE tự sinh CODE
+        return await documentsApi.createBundle({
+          documentNo: item.documentNo,
+          documentType: item.documentType,
+          subject: item.subject,
+          senderCode: item.senderCode,
+          senderName: item.senderName,
+          status: item.status || '1',
+          files: attachmentFiles,
         });
-      } catch {
-        // Keep UI usable even if demo endpoint is unavailable.
+      } else {
+        // Cập nhật: dùng Create cũ (JSON)
+        const docRes = await documentsApi.createOrUpdate({
+          id: item.numericId,
+          code: item.code || item.documentNo,
+          documentNo: item.documentNo,
+          documentType: item.documentType,
+          subject: item.subject,
+          senderCode: item.senderCode,
+          senderName: item.senderName,
+          status: item.status || '1',
+        });
+        // Upload file đính kèm nếu có
+        if (attachmentFiles.length > 0) {
+          await Promise.all(
+            attachmentFiles.map((file) =>
+              documentAttachmentsApi.create({
+                documentId: item.documentNo || item.code,
+                originalFileName: file.name,
+                contentType: file.type || 'application/pdf',
+                objectKey: `documents/${item.documentNo || item.code}/${file.name}`,
+                fileSize: file.size,
+              })
+            )
+          );
+        }
+        return docRes;
       }
-    }
-
-    loadSavedDocuments();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!detailDoc) return;
-    const latest = documentList.find((doc) => doc.code === detailDoc.code);
-    if (!latest) {
-      setDetailDoc(null);
-      return;
-    }
-    if (latest !== detailDoc) {
-      setDetailDoc(latest);
-    }
-  }, [detailDoc, documentList]);
-
-  useEffect(() => {
-    const nextUrls: Record<string, string> = {};
-
-    formValues.attachments.forEach((name) => {
-      const file = attachmentFiles.find((item) => item.name === name);
-      if (file) {
-        nextUrls[name] = URL.createObjectURL(file);
+    },
+    onMutate: () => showLoading(),
+    onSettled: () => hideLoading(),
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
+        queryClient.invalidateQueries({ queryKey: ['documentAttachments'] });
+        refetch();
+        setOpenForm(false);
+        setAttachmentFiles([]);
       }
-    });
+    },
+  });
 
-    setFormAttachmentPreviewUrls(nextUrls);
+  // TanStack Mutation: Delete Document (Delete DOCUMENTS)
+  const deleteMutation = useMutation({
+    mutationFn: (numericId: number) => documentsApi.delete(numericId),
+    onMutate: () => showLoading(),
+    onSettled: () => hideLoading(),
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
+        refetch();
+      }
+      setDeletingId(null);
+    },
+  });
 
-    return () => {
-      Object.values(nextUrls).forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [attachmentFiles, formValues.attachments]);
-
-  const filteredDocuments = useMemo(
-    () =>
-      [...documentList]
-        .filter(
-          (d) =>
-            (typeFilter === '' || d.type === typeFilter) &&
-            (d.code.toLowerCase().includes(keyword.toLowerCase()) ||
-              d.title.toLowerCase().includes(keyword.toLowerCase()) ||
-              d.sender.toLowerCase().includes(keyword.toLowerCase()) ||
-              d.receiver.toLowerCase().includes(keyword.toLowerCase()))
-        )
-        .sort((a, b) => parseDocumentDate(b.createdAt) - parseDocumentDate(a.createdAt)),
-    [documentList, keyword, typeFilter]
-  );
+  const filteredDocuments = useMemo(() => {
+    const q = keyword.trim().toLowerCase();
+    if (!q) return documentList;
+    return documentList.filter(
+      (d) =>
+        d.code.toLowerCase().includes(q) ||
+        d.documentNo.toLowerCase().includes(q) ||
+        d.subject.toLowerCase().includes(q) ||
+        d.senderCode.toLowerCase().includes(q) ||
+        d.senderName.toLowerCase().includes(q)
+    );
+  }, [documentList, keyword]);
 
   const documentRows = filteredDocuments.map((d) => ({
     code: d.code,
-    title: (
-      <Typography variant="body2" sx={{ maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {d.title}
-      </Typography>
+    documentNo: d.documentNo,
+    documentType: d.documentType,
+    sender: (
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>{d.senderName}</Typography>
+        <Typography variant="caption" color="text.secondary">{d.senderCode}</Typography>
+      </Box>
     ),
-    type: <Chip label={d.type} size="small" variant="outlined" />,
-    sender: d.sender,
-    receiver: d.receiver,
-    version: d.version,
-    attachments: <Chip label={`${d.attachments.length} tệp`} size="small" color="default" variant="outlined" />,
-    signStatus: <StatusChip status={d.signStatus} />,
-    classification: <StatusChip status={d.classification} />,
-    status: <StatusChip status={d.status} />,
-    createdAt: d.createdAt,
+    status: d.status === '1' || d.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng',
+    createdAt: formatTime(d.createdAt),
     actions: (
-      <DocumentActionsMenu
-        onDetail={() => handleOpenDetail(d.code)}
-        onEdit={() => handleEdit(d)}
-        onDelete={() => handleDelete(d.code)}
-      />
+      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+        <Tooltip title="Chi tiết">
+          <IconButton size="small" color="info" onClick={() => setDetailDoc(d)}>
+            <Iconify icon="solar:eye-bold" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Sửa">
+          <IconButton size="small" color="primary" onClick={() => handleEdit(d)}>
+            <Iconify icon="solar:pen-bold" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Xóa">
+          <IconButton size="small" color="error" onClick={() => setDeletingId(d.numericId || null)}>
+            <Iconify icon="solar:trash-bin-trash-bold" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
     ),
   }));
 
   function handleOpenCreate() {
     setEditingCode(null);
     setAttachmentFiles([]);
+    const now = Date.now();
     setFormValues({
       ...emptyDocumentForm,
-      code: `VB-2026-${String(Date.now()).slice(-6)}`,
-      createdAt: formatDocumentDate(new Date()),
+      code: ``,
+      documentNo: ``,
+      createdAt: formatTime(new Date()),
     });
     setOpenForm(true);
   }
@@ -355,241 +335,88 @@ export default function DocumentManagementPage() {
     setOpenForm(true);
   }
 
-  function handleDelete(code: string) {
-    setDocumentList((prev) => prev.filter((d) => d.code !== code));
-  }
-
-  function handleOpenDetail(code: string) {
-    const doc = documentList.find((item) => item.code === code);
-    if (!doc) return;
-    setDetailDoc(doc);
-    setDetailTab(0);
-  }
-
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const newFiles = Array.from(event.target.files ?? []);
     if (newFiles.length === 0) return;
 
     setAttachmentFiles((prev) => {
-      const existing = new Set(prev.map((f) => f.name));
-      const toAdd = newFiles.filter((f) => !existing.has(f.name));
-      return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
-    });
-
-    setFormValues((prev) => {
-      const existing = new Set(prev.attachments);
-      const toAddNames = newFiles.map((f) => f.name).filter((n) => !existing.has(n));
-      return toAddNames.length > 0 ? { ...prev, attachments: [...prev.attachments, ...toAddNames] } : prev;
+      const existingNames = new Set(prev.map((f) => f.name));
+      const toAdd = newFiles.filter((f) => !existingNames.has(f.name));
+      return [...prev, ...toAdd];
     });
 
     event.target.value = '';
   }
 
-  function handleRemoveAttachment(fileName: string) {
-    setFormValues((prev) => ({
-      ...prev,
-      attachments: prev.attachments.filter((item) => item !== fileName),
-    }));
+  function handleRemoveFile(fileName: string) {
     setAttachmentFiles((prev) => prev.filter((f) => f.name !== fileName));
   }
 
-  function handleOpenSignStudio() {
-    if (!formValues.title || !formValues.sender || !formValues.receiver || formValues.attachments.length === 0) return;
-    setOpenSignDialog(true);
+  function handleSubmit() {
+    if (!formValues.documentNo || !formValues.subject || !formValues.documentType || !formValues.senderCode || !formValues.senderName) return;
+    saveMutation.mutate(formValues);
   }
 
-  function arrayBufferToBase64(buffer: ArrayBuffer) {
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 0x8000;
-    let binary = '';
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const slice = bytes.subarray(i, i + chunkSize);
-      let chunkBinary = '';
-      for (let j = 0; j < slice.length; j += 1) {
-        chunkBinary += String.fromCharCode(slice[j]);
-      }
-      binary += chunkBinary;
-    }
-    return btoa(binary);
-  }
-
-  async function fileToBase64(file: File) {
-    const buf = await file.arrayBuffer();
-    return arrayBufferToBase64(buf);
-  }
-
-  function getDemoAttachmentUrl(code: string, fileName?: string) {
-    if (!fileName) return undefined;
-    return `/api/demo-documents/file?code=${encodeURIComponent(code)}&fileName=${encodeURIComponent(fileName)}`;
-  }
-
-  async function saveDocumentToDemoStorage(
-    document: ManagedDocumentRecord,
-    attachmentsPayload: { fileName: string; contentType: string; base64: string }[] = []
-  ) {
-    const resp = await fetch('/api/demo-documents/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        document,
-        attachments: attachmentsPayload,
-      }),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '');
-      throw new Error(text || `HTTP ${resp.status}`);
-    }
-
-    return resp.json();
-  }
-
-  async function handleSubmit() {
-    if (!formValues.code || !formValues.title || !formValues.sender || !formValues.receiver || formValues.attachments.length === 0) return;
-
-    try {
-      const attachmentsPayload = await Promise.all(
-        attachmentFiles.map(async (file) => ({
-          fileName: file.name,
-          contentType: file.type || 'application/octet-stream',
-          base64: await fileToBase64(file),
-        }))
-      );
-
-      const saved = await saveDocumentToDemoStorage(formValues, attachmentsPayload);
-
-      if (editingCode) {
-        setDocumentList((prev) => prev.map((d) => (d.code === editingCode ? formValues : d)));
-      } else {
-        setDocumentList((prev) => [formValues, ...prev]);
-      }
-
-      setOpenForm(false);
-      setAttachmentFiles([]);
-      enqueueSnackbar(`Đã lưu demo: ${saved?.savedTo ?? 'OK'}`, { variant: 'success' });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Lỗi không xác định';
-      enqueueSnackbar(`Lưu demo thất bại: ${message}`, { variant: 'error' });
+  function handleConfirmDelete() {
+    if (deletingId) {
+      deleteMutation.mutate(deletingId);
     }
   }
 
   return (
     <PageShell
-      title="Document Management"
-      subtitle="Quản lý toàn bộ vòng đời văn bản điện tử: tạo mới, metadata, file đính kèm, ký số, gửi nhận, lưu trữ và tra cứu trên một màn hình."
+      title="Quản lý văn bản"
+      subtitle="Quản lý danh sách các văn bản điện tử và tệp tin đính kèm trong hệ thống."
     >
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
         <MetricCard
           label="Tổng văn bản"
-          value={documentList.length}
-          helper={`${documentList.filter((d) => d.status === 'Đã phát hành').length} đã phát hành`}
+          value={totalCount}
+          helper="Tất cả văn bản trong hệ thống"
           icon="solar:documents-bold"
         />
         <MetricCard
-          label="Có đính kèm"
-          value={documentList.filter((d) => d.attachments.length > 0).length}
-          helper="Có tối thiểu 1 tệp"
-          icon="solar:paperclip-2-bold"
-        />
-        <MetricCard
-          label="Đã ký số"
-          value={documentList.filter((d) => d.signStatus === 'Đã ký số').length}
-          helper="Hoàn tất bước ký"
+          label="Đang hoạt động"
+          value={documentList.filter((d) => d.status === '1' || d.status === 'Active').length}
+          helper="Văn bản sử dụng"
           icon="solar:shield-check-bold"
         />
         <MetricCard
-          label="Đang xử lý"
-          value={documentList.filter((d) => d.status === 'Đang xử lý').length}
-          helper="Chờ xử lý hoặc phát hành"
-          icon="solar:refresh-circle-bold"
+          label="Ngưng dùng"
+          value={documentList.filter((d) => d.status !== '1' && d.status !== 'Active').length}
+          helper="Ngưng hoạt động"
+          icon="solar:shield-warning-bold"
+        />
+        <MetricCard
+          label="Loại văn bản"
+          value={new Set(documentList.map((d) => d.documentType)).size}
+          helper="Phân loại hệ thống"
+          icon="solar:category-bold"
         />
       </GridRow>
 
-      <Stack direction="row" justifyContent="flex-end">
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<Iconify icon={lifecycleExpanded ? 'solar:alt-arrow-up-bold' : 'solar:alt-arrow-down-bold'} />}
-          onClick={() => setLifecycleExpanded((prev) => !prev)}
-        >
-          {lifecycleExpanded ? 'Thu gọn' : 'Mở rộng'}
-        </Button>
-      </Stack>
-      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>
-        <Box>
-          <SectionCard
-            title="Vòng đời văn bản"
-            subtitle="Chuỗi xử lý từ tạo mới đến lưu trữ hoặc hủy."
-          >
-            {lifecycleExpanded && (
-              <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: 'repeat(2,1fr)', sm: 'repeat(3,1fr)', md: 'repeat(5,1fr)' } }}>
-                {documentLifecycle.map((step, index) => (
-                  <Box key={step} sx={{ p: 1.5, borderRadius: 2, bgcolor: 'background.neutral', textAlign: 'center' }}>
-                    <Typography variant="overline" color="text.secondary" display="block">
-                      Bước {index + 1}
-                    </Typography>
-                    <Typography variant="subtitle2">{step}</Typography>
-                  </Box>
-                ))}
-              </Box>
-            )}
-            {!lifecycleExpanded && (
-              <Typography variant="body2" color="text.secondary">
-                Đã thu gọn {documentLifecycle.length} bước vòng đời văn bản. Bấm &quot;Mở rộng&quot; để xem chi tiết.
-              </Typography>
-            )}
-          </SectionCard>
-        </Box>
-
-        <Box>
-          <SectionCard
-            title="Ký số & lưu trữ"
-            subtitle="Những điểm chính trong luồng xử lý văn bản."
-          >
-            {lifecycleExpanded ? (
-              <Stack spacing={1.5}>
-                {[
-                  { icon: 'solar:shield-check-bold', label: 'Bắt buộc ký số', text: 'Luồng thêm mới hỗ trợ tải tệp và mở popup ký số ngay trong form.' },
-                  { icon: 'solar:folder-bold', label: 'Lưu trữ tệp', text: 'Mỗi văn bản có thể chứa nhiều tệp đính kèm để theo dõi bản chính và phụ lục.' },
-                  { icon: 'solar:clipboard-list-bold', label: 'Nhật ký kiểm toán', text: 'Ghi nhận thao tác tạo, tải tệp, ký số, phát hành và gửi liên thông.' },
-                ].map((item) => (
-                  <Box key={item.label} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                      <Iconify icon={item.icon} width={20} sx={{ mt: 0.25, color: 'primary.main', flexShrink: 0 }} />
-                      <Box>
-                        <Typography variant="subtitle2">{item.label}</Typography>
-                        <Typography variant="body2" color="text.secondary">{item.text}</Typography>
-                      </Box>
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                Đã thu gọn phần ký số &amp; lưu trữ. Bấm &quot;Mở rộng&quot; để xem chi tiết.
-              </Typography>
-            )}
-          </SectionCard>
-        </Box>
-      </Box>
-
       <SectionCard
         title="Danh sách văn bản"
-        subtitle="Tìm kiếm, lọc, thêm mới và theo dõi ngay cả file đính kèm lẫn trạng thái ký số."
+        subtitle="Danh sách văn bản và trạng thái kết nối liên thông."
         action={
-          <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={handleOpenCreate}>
-            Thêm văn bản
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? 'Đang tải...' : 'Làm mới'}
+            </Button>
+            <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={handleOpenCreate}>
+              Thêm văn bản
+            </Button>
+          </Stack>
         }
       >
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
             <TextField
               size="small"
               label="Tìm kiếm"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Số ký hiệu, trích yếu, nơi gửi, nơi nhận..."
+              placeholder="Mã, số ký hiệu, trích yếu, mã/tên CQ gửi..."
               sx={{ flex: 1 }}
             />
             <TextField
@@ -597,163 +424,198 @@ export default function DocumentManagementPage() {
               label="Lọc loại văn bản"
               select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setPageIndex(1);
+              }}
               sx={{ minWidth: 180 }}
             >
-              {DOC_TYPES.map((t) => (
-                <MenuItem key={t} value={t}>{t === '' ? 'Tất cả' : t}</MenuItem>
+              <MenuItem value="">Tất cả</MenuItem>
+              {docTypeOptions.map((item: any) => (
+                <MenuItem key={item.code} value={item.code}>
+                  {item.name}
+                </MenuItem>
               ))}
             </TextField>
+            <TextField
+              size="small"
+              type="date"
+              label="Từ ngày"
+              InputLabelProps={{ shrink: true }}
+              value={cdateStart}
+              onChange={(e) => {
+                setCdateStart(e.target.value);
+                setPageIndex(1);
+              }}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Đến ngày"
+              InputLabelProps={{ shrink: true }}
+              value={cdateEnd}
+              onChange={(e) => {
+                setCdateEnd(e.target.value);
+                setPageIndex(1);
+              }}
+              sx={{ minWidth: 160 }}
+            />
           </Stack>
 
-          <DataTable
-            columns={[
-              { key: 'code', label: 'Số ký hiệu' },
-              { key: 'title', label: 'Trích yếu' },
-              { key: 'type', label: 'Loại', align: 'center' },
-              { key: 'sender', label: 'Nơi gửi' },
-              { key: 'receiver', label: 'Nơi nhận' },
-              { key: 'version', label: 'Phiên bản', align: 'center' },
-              { key: 'attachments', label: 'Tệp', align: 'center' },
-              { key: 'signStatus', label: 'Ký số', align: 'center' },
-              { key: 'classification', label: 'Phân loại', align: 'center' },
-              { key: 'status', label: 'Trạng thái', align: 'center' },
-              { key: 'createdAt', label: 'Ngày tạo' },
-              { key: 'actions', label: 'Thao tác', align: 'right' },
-            ]}
-            rows={documentRows}
-          />
+          <Box sx={{ overflowX: 'auto' }}>
+            <DataTable
+              columns={[
+                { key: 'code', label: 'Mã' },
+                { key: 'documentNo', label: 'Số ký hiệu' },
+                { key: 'documentType', label: 'Loại VB', align: 'center' },
+                { key: 'sender', label: 'Cơ quan gửi' },
+                { key: 'status', label: 'Trạng thái', align: 'center' },
+                { key: 'createdAt', label: 'Ngày tạo', align: 'center' },
+                { key: 'actions', label: 'Thao tác', align: 'right' },
+              ]}
+              rows={documentRows}
+              loading={isFetching}
+              pageIndex={pageIndex}
+              rowsPerPage={pageSize}
+              totalCount={totalCount}
+              onPageChange={(newPage) => setPageIndex(newPage)}
+              onRowsPerPageChange={(newSize) => {
+                setPageSize(newSize);
+                setPageIndex(1);
+              }}
+            />
+          </Box>
         </Stack>
       </SectionCard>
 
-      <Dialog open={Boolean(detailDoc)} onClose={() => setDetailDoc(null)} fullWidth maxWidth="xl">
+      {/* Dialog Chi tiết */}
+      <Dialog open={Boolean(detailDoc)} onClose={() => setDetailDoc(null)} fullWidth maxWidth="md">
         {detailDoc && (
           <>
             <DialogTitle>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                  <Typography variant="h6">{detailDoc.code}</Typography>
-                  <Typography variant="body2" color="text.secondary">{detailDoc.title}</Typography>
-                </Box>
-                <StatusChip status={detailDoc.status} />
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Iconify icon="solar:document-bold" width={24} sx={{ color: 'primary.main' }} />
+                <Typography variant="h6">Chi tiết văn bản: {detailDoc.documentNo}</Typography>
               </Stack>
             </DialogTitle>
-            <Divider />
-            <DialogContent sx={{ pt: 1 }}>
-              <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 2 }}>
-                <Tab label="Metadata" icon={<Iconify icon="solar:document-text-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                <Tab label="Attachment" icon={<Iconify icon="solar:paperclip-2-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                <Tab label="Ký số" icon={<Iconify icon="solar:shield-check-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                <Tab label="Version" icon={<Iconify icon="solar:history-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                <Tab label="Audit Trail" icon={<Iconify icon="solar:clipboard-list-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-              </Tabs>
-
-              {detailTab === 0 && (
-                <Grid container spacing={2}>
-                  {[
-                    { label: 'Số ký hiệu', value: detailDoc.code },
-                    { label: 'Loại văn bản', value: detailDoc.type },
-                    { label: 'Nơi gửi', value: detailDoc.sender },
-                    { label: 'Nơi nhận', value: detailDoc.receiver },
-                    { label: 'Phiên bản', value: detailDoc.version },
-                    { label: 'Phân loại', value: detailDoc.classification },
-                    { label: 'Trạng thái', value: detailDoc.status },
-                    { label: 'Nhà cung cấp ký', value: detailDoc.signProvider },
-                    { label: 'Ký số', value: `${detailDoc.signStatus} (${detailDoc.signedPositions} vị trí)` },
-                    { label: 'Ngày tạo', value: detailDoc.createdAt },
-                  ].map((row) => (
-                    <Grid key={row.label} item xs={12} sm={6}>
-                      <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                        <Typography variant="caption" color="text.secondary">{row.label}</Typography>
-                        <Typography variant="subtitle2">{row.value}</Typography>
-                      </Box>
-                    </Grid>
-                  ))}
-                  <Grid item xs={12}>
-                    <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                      <Typography variant="caption" color="text.secondary">Trích yếu</Typography>
-                      <Typography variant="body2">{detailDoc.title}</Typography>
-                    </Box>
-                  </Grid>
+            <DialogContent dividers>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="caption" color="text.secondary">Mã văn bản</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{detailDoc.code}</Typography>
                 </Grid>
-              )}
+                <Grid item xs={12} md={4}>
+                  <Typography variant="caption" color="text.secondary">Số ký hiệu</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{detailDoc.documentNo}</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="caption" color="text.secondary">Loại văn bản</Typography>
+                  <Typography variant="body2">{detailDoc.documentType}</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="caption" color="text.secondary">Mã cơ quan gửi</Typography>
+                  <Typography variant="body2">{detailDoc.senderCode}</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="caption" color="text.secondary">Tên cơ quan gửi</Typography>
+                  <Typography variant="body2">{detailDoc.senderName}</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="caption" color="text.secondary">Trạng thái</Typography>
+                  <Typography variant="body2">{detailDoc.status === '1' || detailDoc.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng'}</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="caption" color="text.secondary">Thời gian tạo</Typography>
+                  <Typography variant="body2">{detailDoc.createdAt}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary">Trích yếu</Typography>
+                  <Typography variant="body2">{detailDoc.subject}</Typography>
+                </Grid>
 
-              {detailTab === 1 && (
-                <DataTable
-                  columns={[
-                    { key: 'fileName', label: 'Tên file' },
-                    { key: 'contentType', label: 'Loại' },
-                    { key: 'size', label: 'Kích thước', align: 'right' },
-                    { key: 'uploadedAt', label: 'Upload lúc' },
-                  ]}
-                  rows={detailDoc.attachments.map((fileName) => ({
-                    fileName,
-                    contentType: fileName.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    size: fileName.endsWith('.pdf') ? '2.4 MB' : '0.8 MB',
-                    uploadedAt: detailDoc.createdAt,
-                  }))}
-                />
-              )}
-
-              {detailTab === 2 && (
-                <Stack spacing={2}>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-                    <Typography variant="subtitle2">Giao diện ký số văn bản</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Nhà cung cấp: {detailDoc.signProvider} | Trạng thái: {detailDoc.signStatus} | Vị trí ký: {detailDoc.signedPositions}
+                {/* Danh sách tệp đính kèm của văn bản */}
+                <Grid item xs={12}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1, mb: 1.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      Tệp đính kèm ({detailDocAttachments?.length || 0})
                     </Typography>
-                  </Box>
-
-                  <SignatureStudio
-                    files={detailDoc.attachments.map((name) => ({
-                      fileName: name,
-                      fileUrl: getDemoAttachmentUrl(detailDoc.code, name),
-                    }))}
-                    onSignComplete={async (signatures) => {
-                      const updatedDoc: ManagedDocumentRecord = {
-                        ...detailDoc,
-                        signStatus: 'Đã ký số',
-                        status: detailDoc.status === 'Đang xử lý' ? 'Chờ ký số' : detailDoc.status,
-                        signedPositions: signatures.length,
-                      };
-
-                      try {
-                        await saveDocumentToDemoStorage(updatedDoc);
-                        setDocumentList((prev) => prev.map((doc) => (doc.code === updatedDoc.code ? updatedDoc : doc)));
-                        setDetailDoc(updatedDoc);
-                        enqueueSnackbar('Đã cập nhật trạng thái ký số cho văn bản', { variant: 'success' });
-                      } catch (e) {
-                        const message = e instanceof Error ? e.message : 'Lỗi không xác định';
-                        enqueueSnackbar(`Cập nhật ký số thất bại: ${message}`, { variant: 'error' });
-                      }
-                    }}
-                  />
-                </Stack>
-              )}
-
-              {detailTab === 3 && (
-                <DataTable
-                  columns={[
-                    { key: 'version', label: 'Phiên bản', align: 'center' },
-                    { key: 'changedBy', label: 'Người thay đổi' },
-                    { key: 'changedAt', label: 'Thời điểm' },
-                    { key: 'note', label: 'Ghi chú' },
-                  ]}
-                  rows={fakeVersions(detailDoc)}
-                />
-              )}
-
-              {detailTab === 4 && (
-                <DataTable
-                  columns={[
-                    { key: 'action', label: 'Hành động' },
-                    { key: 'actor', label: 'Người thực hiện' },
-                    { key: 'time', label: 'Thời gian' },
-                    { key: 'detail', label: 'Chi tiết' },
-                  ]}
-                  rows={fakeAudit(detailDoc)}
-                />
-              )}
+                  </Stack>
+                  {detailDocAttachments && detailDocAttachments.length > 0 ? (
+                    <Grid container spacing={1.5}>
+                      {detailDocAttachments.map((att: any) => {
+                        const fileInfo = getFileExtensionInfo(att.originalFileName);
+                        return (
+                          <Grid item xs={12} sm={6} key={att.id || att.originalFileName}>
+                            <Paper
+                              variant="outlined"
+                              sx={{
+                                p: 1.75,
+                                borderRadius: 2,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  borderColor: 'primary.main',
+                                  boxShadow: (theme) => theme.customShadows?.z4 || '0 4px 12px rgba(0,0,0,0.06)',
+                                },
+                              }}
+                            >
+                              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1, mr: 1 }}>
+                                <Box
+                                  sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: 1.5,
+                                    bgcolor: fileInfo.bg,
+                                    color: fileInfo.color,
+                                    display: 'grid',
+                                    placeItems: 'center',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <Iconify icon={fileInfo.icon} width={24} />
+                                </Box>
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 600,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {att.originalFileName}
+                                  </Typography>
+                                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
+                                    <Chip label={fileInfo.label} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: fileInfo.bg, color: fileInfo.color }} />
+                                    <Typography variant="caption" color="text.secondary">
+                                      {(att.fileSize / 1024).toFixed(1)} KB
+                                    </Typography>
+                                  </Stack>
+                                </Box>
+                              </Stack>
+                              <Tooltip title="Tải tệp tin">
+                                <IconButton size="small" color="primary" sx={{ bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08) }}>
+                                  <Iconify icon="solar:download-bold" width={18} />
+                                </IconButton>
+                              </Tooltip>
+                            </Paper>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                  ) : (
+                    <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderRadius: 2, bgcolor: (theme) => alpha(theme.palette.grey[500], 0.03) }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Chưa có tệp đính kèm nào.
+                      </Typography>
+                    </Paper>
+                  )}
+                </Grid>
+              </Grid>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setDetailDoc(null)}>Đóng</Button>
@@ -762,185 +624,298 @@ export default function DocumentManagementPage() {
         )}
       </Dialog>
 
-      <Dialog open={openForm} onClose={() => setOpenForm(false)} fullWidth maxWidth="md">
-        <DialogTitle>{editingCode ? 'Cập nhật văn bản' : 'Tạo mới văn bản'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Số ký hiệu"
-                disabled={Boolean(editingCode)}
-                value={formValues.code}
-                onChange={(e) => setFormValues((p) => ({ ...p, code: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Loại văn bản"
-                select
-                value={formValues.type}
-                onChange={(e) => setFormValues((p) => ({ ...p, type: e.target.value }))}
+      {/* Dialog Tạo mới / Cập nhật thiết kế hiện đại, tinh gọn */}
+      <Dialog
+        open={openForm}
+        onClose={() => setOpenForm(false)}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{
+          sx: { borderRadius: 2 },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 1.5,
+                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                color: 'primary.main',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <Iconify icon={editingCode ? 'solar:pen-bold' : 'solar:document-add-bold'} width={24} />
+            </Box>
+            <Box>
+              <Typography variant="h6">{editingCode ? 'Cập nhật văn bản' : 'Tạo mới văn bản'}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Nhập các thông tin văn bản và đính kèm tệp tin tương ứng.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Stack spacing={3}>
+            {/* Khối 1: Thông tin văn bản */}
+            <Box>
+              <Typography variant="subtitle2" color="primary" sx={{ mb: 1.5, fontWeight: 700 }}>
+                1. Thông tin văn bản
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Số ký hiệu"
+                    value={formValues.documentNo}
+                    onChange={(e) => setFormValues((prev) => ({ ...prev, documentNo: e.target.value }))}
+                    placeholder="Nhập số ký hiệu văn bản"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    select
+                    label="Loại văn bản"
+                    value={formValues.documentType}
+                    onChange={(e) => setFormValues((prev) => ({ ...prev, documentType: e.target.value }))}
+                  >
+                    {docTypeOptions.map((item: any) => (
+                      <MenuItem key={item.code} value={item.code}>
+                        {item.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={2.5}
+                    label="Trích yếu"
+                    value={formValues.subject}
+                    onChange={(e) => setFormValues((prev) => ({ ...prev, subject: e.target.value }))}
+                    placeholder="Nhập nội dung trích yếu văn bản"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Divider />
+
+            {/* Khối 2: Đơn vị phát hành */}
+            <Box>
+              <Typography variant="subtitle2" color="primary" sx={{ mb: 1.5, fontWeight: 700 }}>
+                2. Đơn vị phát hành
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    select
+                    label="Đơn vị phát hành"
+                    value={formValues.senderCode}
+                    onChange={(e) => {
+                      const selected = donViOptions.find((o) => o.code === e.target.value);
+                      setFormValues((prev) => ({
+                        ...prev,
+                        senderCode: selected?.code || '',
+                        senderName: selected?.name || '',
+                      }));
+                    }}
+                  >
+                    {donViOptions.map((item) => (
+                      <MenuItem key={item.code} value={item.code}>
+                        {item.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Divider />
+
+            {/* Khối 3: Tệp đính kèm */}
+            <Box>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700 }}>
+                  3. Tệp đính kèm
+                </Typography>
+                {attachmentFiles.length > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    Đã chọn <b>{attachmentFiles.length}</b> tệp tin
+                  </Typography>
+                )}
+              </Stack>
+
+              <Box
+                component="label"
+                onDragOver={(e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e: React.DragEvent) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  const droppedFiles = Array.from(e.dataTransfer.files ?? []);
+                  if (droppedFiles.length === 0) return;
+                  setAttachmentFiles((prev) => {
+                    const existingNames = new Set(prev.map((f) => f.name));
+                    return [...prev, ...droppedFiles.filter((f) => !existingNames.has(f.name))];
+                  });
+                }}
+                sx={{
+                  p: 3,
+                  display: 'block',
+                  textAlign: 'center',
+                  border: (theme) => `1px solid ${isDragOver ? theme.palette.primary.main : theme.palette.divider}`,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease-in-out',
+                  bgcolor: (theme) => isDragOver ? alpha(theme.palette.primary.main, 0.05) : 'transparent',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.03),
+                  },
+                }}
               >
-                {DOC_TYPES.filter((t) => t !== '').map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Trích yếu"
-                value={formValues.title}
-                onChange={(e) => setFormValues((p) => ({ ...p, title: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Nơi gửi"
-                value={formValues.sender}
-                onChange={(e) => setFormValues((p) => ({ ...p, sender: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Nơi nhận"
-                value={formValues.receiver}
-                onChange={(e) => setFormValues((p) => ({ ...p, receiver: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Phiên bản"
-                value={formValues.version}
-                onChange={(e) => setFormValues((p) => ({ ...p, version: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Phân loại"
-                select
-                value={formValues.classification}
-                onChange={(e) => setFormValues((p) => ({ ...p, classification: e.target.value }))}
-              >
-                {['Thường', 'Nội bộ', 'Mật', 'Tối mật'].map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Trạng thái"
-                select
-                value={formValues.status}
-                onChange={(e) => setFormValues((p) => ({ ...p, status: e.target.value }))}
-              >
-                {['Đang xử lý', 'Chờ ký số', 'Đã phát hành', 'Đã nhận', 'Đang lưu trữ'].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-              </TextField>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-                <Stack spacing={1.5}>
-                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
-                    <Box>
-                      <Typography variant="subtitle2">Tệp đính kèm văn bản</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Tải file PDF, DOCX hoặc phụ lục để đưa vào quy trình ký số.
-                      </Typography>
-                    </Box>
-                    <Button variant="outlined" component="label" startIcon={<Iconify icon="solar:upload-bold" />}>
-                      Upload file
-                      <input hidden multiple type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={handleFileChange} />
-                    </Button>
-                  </Stack>
-
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
-                    {formValues.attachments.length > 0 ? (
-                      formValues.attachments.map((file) => (
-                        <Chip key={file} label={file} onDelete={() => handleRemoveAttachment(file)} variant="outlined" />
-                      ))
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">Chưa có tệp đính kèm.</Typography>
-                    )}
-                  </Stack>
-                </Stack>
-              </Box>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Alert severity="info">
-                Luồng thêm mới hiện hỗ trợ đủ 3 bước trên cùng popup: nhập metadata, upload file và mở giao diện ký số.
-              </Alert>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
+                <input type="file" hidden multiple onChange={handleFileChange} />
+                <Stack spacing={1.25} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 2,
+                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                      color: 'primary.main',
+                      display: 'grid',
+                      placeItems: 'center',
+                      transform: isDragOver ? 'scale(1.08)' : 'scale(1)',
+                      transition: 'transform 0.15s ease',
+                    }}
+                  >
+                    <Iconify icon="solar:cloud-upload-bold-duotone" width={32} />
+                  </Box>
                   <Box>
-                    <Typography variant="subtitle2">Popup giao diện ký số</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Nhà cung cấp: {formValues.signProvider} | Trạng thái: {formValues.signStatus} | Vị trí ký: {formValues.signedPositions}
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      {isDragOver ? 'Thả tệp vào đây' : 'Nhấp để chọn tệp hoặc kéo thả vào đây'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                      PDF, WORD (.docx), EXCEL (.xlsx), ZIP — Tối đa 25MB/tệp
                     </Typography>
                   </Box>
-                  <Button
-                    variant="contained"
-                    onClick={handleOpenSignStudio}
-                    disabled={!formValues.title || !formValues.sender || !formValues.receiver || formValues.attachments.length === 0}
-                  >
-                    Mở giao diện ký số
-                  </Button>
                 </Stack>
               </Box>
-            </Grid>
-          </Grid>
+
+
+              {attachmentFiles.length > 0 && (
+                <Grid container spacing={1.5} sx={{ mt: 1 }}>
+                  {attachmentFiles.map((file) => {
+                    const fileInfo = getFileExtensionInfo(file.name);
+                    return (
+                      <Grid item xs={12} sm={6} key={file.name}>
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 1.5,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            bgcolor: 'background.paper',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                          }}
+                        >
+                          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1, mr: 1 }}>
+                            <Box
+                              sx={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: 1.25,
+                                bgcolor: fileInfo.bg,
+                                color: fileInfo.color,
+                                display: 'grid',
+                                placeItems: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Iconify icon={fileInfo.icon} width={22} />
+                            </Box>
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {file.name}
+                              </Typography>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Chip label={fileInfo.label} size="small" sx={{ height: 16, fontSize: '0.6rem', fontWeight: 700, bgcolor: fileInfo.bg, color: fileInfo.color }} />
+                                <Typography variant="caption" color="text.secondary">
+                                  {(file.size / 1024).toFixed(1)} KB
+                                </Typography>
+                              </Stack>
+                            </Box>
+                          </Stack>
+                          <Tooltip title="Xóa tệp">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleRemoveFile(file.name)}
+                              sx={{
+                                '&:hover': {
+                                  bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                                },
+                              }}
+                            >
+                              <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                            </IconButton>
+                          </Tooltip>
+                        </Paper>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              )}
+            </Box>
+          </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setOpenForm(false);
-              setAttachmentFiles([]);
-            }}
-          >
+
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button variant="outlined" color="inherit" onClick={() => setOpenForm(false)}>
             Hủy
           </Button>
-          <Button variant="contained" onClick={handleSubmit}>Lưu</Button>
+          <Button
+            variant="contained"
+            startIcon={<Iconify icon="solar:diskette-bold" />}
+            onClick={handleSubmit}
+            disabled={saveMutation.isPending}
+          >
+            {saveMutation.isPending ? 'Đang lưu...' : 'Lưu văn bản'}
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openSignDialog} onClose={() => setOpenSignDialog(false)} fullWidth maxWidth="xl">
-        <DialogTitle>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
-            <Box>
-              <Typography variant="h6">Giao diện ký số văn bản</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {formValues.code} · {formValues.attachments[0] ?? 'Chưa có file'}
-              </Typography>
-            </Box>
-            <StatusChip status={formValues.signStatus} />
-          </Stack>
-        </DialogTitle>
-        <DialogContent dividers>
-          <SignatureStudio
-            files={formValues.attachments.map((name) => ({
-              fileName: name,
-              fileUrl: formAttachmentPreviewUrls[name] ?? getDemoAttachmentUrl(formValues.code, name),
-            }))}
-            onSignComplete={(signatures) => {
-              setFormValues((prev) => ({
-                ...prev,
-                signStatus: 'Đã ký số',
-                status: prev.status === 'Đang xử lý' ? 'Chờ ký số' : prev.status,
-                signedPositions: signatures.length,
-              }));
-              setOpenSignDialog(false);
-            }}
-          />
+      {/* Dialog Xác nhận Xóa */}
+      <Dialog open={Boolean(deletingId)} onClose={() => setDeletingId(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Xác nhận xóa</DialogTitle>
+        <DialogContent>
+          Bạn có chắc muốn xóa văn bản này không?
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenSignDialog(false)}>Đóng</Button>
+          <Button onClick={() => setDeletingId(null)}>Hủy</Button>
+          <Button color="error" variant="contained" onClick={handleConfirmDelete} disabled={deleteMutation.isPending}>
+            Xóa
+          </Button>
         </DialogActions>
       </Dialog>
     </PageShell>

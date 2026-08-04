@@ -54,6 +54,13 @@ type DataTableProps<T extends Record<string, ReactNode>> = {
   rows: T[];
   minWidth?: number | string;
   maxHeight?: number | string;
+  loading?: boolean;
+  // Controlled Server-side Pagination
+  pageIndex?: number; // 1-based page index
+  rowsPerPage?: number;
+  totalCount?: number;
+  onPageChange?: (pageIndex: number) => void;
+  onRowsPerPageChange?: (rowsPerPage: number) => void;
 };
 
 /** Responsive grid row dùng CSS grid — không có margin âm như MUI Grid container spacing */
@@ -107,9 +114,6 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
               boxShadow: (theme) => theme.shadows[12],
             }}
           >
-            {/* <Typography variant="overline" sx={{ opacity: 0.8 }}>
-              TRỤC LIÊN THÔNG VĂN BẢN
-            </Typography> */}
             <Typography variant="h3" sx={{ mt: 1, mb: 1 }}>
               {title}
             </Typography>
@@ -233,15 +237,36 @@ export function DataTable<T extends Record<string, ReactNode>>({
   rows,
   minWidth = 960,
   maxHeight = 480,
+  loading = false,
+  pageIndex: controlledPageIndex,
+  rowsPerPage: controlledRowsPerPage,
+  totalCount: controlledTotalCount,
+  onPageChange,
+  onRowsPerPageChange,
 }: DataTableProps<T>) {
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [internalPage, setInternalPage] = useState(0);
+  const [internalRowsPerPage, setInternalRowsPerPage] = useState(10);
 
-  const paginatedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+  const isServerSide = controlledPageIndex !== undefined && onPageChange !== undefined;
+
+  const activePageIndex = isServerSide ? controlledPageIndex : internalPage + 1;
+  const activeRowsPerPage = isServerSide ? (controlledRowsPerPage || 10) : internalRowsPerPage;
+  const activeTotalCount = isServerSide ? (controlledTotalCount ?? rows.length) : rows.length;
+
+  const displayedRows = isServerSide
+    ? rows
+    : rows.slice(internalPage * internalRowsPerPage, (internalPage + 1) * internalRowsPerPage);
+
+  const totalPages = Math.max(1, Math.ceil(activeTotalCount / activeRowsPerPage));
+
+  const startRecord = activeTotalCount === 0 ? 0 : (activePageIndex - 1) * activeRowsPerPage + 1;
+  const endRecord = Math.min(activePageIndex * activeRowsPerPage, activeTotalCount);
 
   return (
     <Stack spacing={1.5}>
+      <Box sx={{ height: 4, width: '100%', overflow: 'hidden' }}>
+        {loading && <LinearProgress color="primary" sx={{ height: 4 }} />}
+      </Box>
       <TableContainer sx={{ maxHeight, overflow: 'auto' }}>
         <Table stickyHeader size="small" sx={{ minWidth }}>
           <TableHead>
@@ -262,7 +287,7 @@ export function DataTable<T extends Record<string, ReactNode>>({
             </TableRow>
           </TableHead>
           <TableBody>
-            {paginatedRows.map((row, index) => (
+            {displayedRows.map((row, index) => (
               <TableRow key={index}>
                 {columns.map((column) => {
                   const value = row[column.key];
@@ -318,10 +343,15 @@ export function DataTable<T extends Record<string, ReactNode>>({
           <TextField
             select
             size="small"
-            value={rowsPerPage}
+            value={activeRowsPerPage}
             onChange={(event) => {
-              setRowsPerPage(parseInt(event.target.value, 10));
-              setPage(0);
+              const newSize = parseInt(event.target.value, 10);
+              if (isServerSide && onRowsPerPageChange) {
+                onRowsPerPageChange(newSize);
+              } else {
+                setInternalRowsPerPage(newSize);
+                setInternalPage(0);
+              }
             }}
             sx={{ minWidth: 96 }}
           >
@@ -332,18 +362,22 @@ export function DataTable<T extends Record<string, ReactNode>>({
             ))}
           </TextField>
           <Typography variant="body2" color="text.secondary">
-            {rows.length === 0
-              ? '0-0 / 0'
-              : `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, rows.length)} / ${rows.length}`}
+            {activeTotalCount === 0 ? '0-0 / 0' : `${startRecord}-${endRecord} / ${activeTotalCount}`}
           </Typography>
         </Stack>
 
         <Pagination
           color="primary"
           shape="rounded"
-          page={page + 1}
+          page={activePageIndex}
           count={totalPages}
-          onChange={(_, value) => setPage(value - 1)}
+          onChange={(_, value) => {
+            if (isServerSide && onPageChange) {
+              onPageChange(value);
+            } else {
+              setInternalPage(value - 1);
+            }
+          }}
           showFirstButton
           showLastButton
         />

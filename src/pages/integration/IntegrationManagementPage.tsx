@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   Box,
   Button,
@@ -29,8 +29,6 @@ import {
   StatusChip,
 } from '../../sections/interoperability/components';
 import Iconify from '../../components/iconify';
-import { dmCategoryApi, getDefaultDateRange } from '../../services/dmCategoryApi';
-import { documentsApi } from '../../services/documentsApi';
 
 const emptyAgencyForm: AgencyConnection = {
   code: '',
@@ -49,12 +47,7 @@ const CREDENTIAL_TYPES = ['OAuth2', 'OAuth2 + mTLS', 'API Key + Signature', 'OAu
 const LEVELS = ['Tỉnh/Thành phố', 'Bộ/Ngành', 'Sở/Ban/Ngành', 'Cơ quan TW', 'Cơ quan địa phương'];
 
 export default function IntegrationManagementPage() {
-  const defaultDates = useMemo(() => getDefaultDateRange(), []);
-  const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
-  const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
-
-  const [agencyList, setAgencyList] = useState<AgencyConnection[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [agencyList, setAgencyList] = useState<AgencyConnection[]>(agencies);
   const [keyword, setKeyword] = useState('');
   const [tab, setTab] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
@@ -62,42 +55,6 @@ export default function IntegrationManagementPage() {
   const [detailTab, setDetailTab] = useState(0);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<AgencyConnection>(emptyAgencyForm);
-
-  useEffect(() => {
-    fetchAgencies();
-  }, [cdateStart, cdateEnd]);
-
-  async function fetchAgencies() {
-    setLoading(true);
-    try {
-      const res = await dmCategoryApi.getList({
-        pageIndex: 1,
-        pageSize: 200,
-        cdateStart,
-        cdateEnd,
-        searchField: { PARENT_CODE: 'DON_VI' },
-      });
-      if (res.data) {
-        const mapped: AgencyConnection[] = res.data.map((item, idx) => ({
-          code: item.code,
-          name: item.name,
-          level: 'Sở/Ban/Ngành',
-          clientId: `cli_${item.code.toLowerCase()}_${idx + 1}`,
-          apiKey: `ak_${item.code.toUpperCase()}***`,
-          endpoint: `https://api.${item.code.toLowerCase()}.gov.vn/v1/interop`,
-          credentialType: 'OAuth2 + Signature',
-          status: item.isActive === 1 ? 'active' : 'pending',
-          successRate: 99,
-          avgLatency: '1.2s',
-        }));
-        setAgencyList(mapped);
-      }
-    } catch (err) {
-      console.warn('API error in IntegrationManagementPage', err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const filteredAgencies = useMemo(
     () =>
@@ -333,7 +290,7 @@ export default function IntegrationManagementPage() {
 
       {/* Main tabs */}
       <SectionCard
-        title="Quản lý đơn vị kết nối"
+        title="Quản lý kết nối"
         subtitle="Chọn nhóm chức năng để xem và thao tác."
       // action={
       //   <Button variant="contained" startIcon={<Iconify icon="solar:user-plus-bold" />} onClick={handleOpenCreate}>
@@ -342,34 +299,14 @@ export default function IntegrationManagementPage() {
       // }
       >
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
-            <TextField
-              size="small"
-              label="Tìm kiếm"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Mã đơn vị, tên, endpoint..."
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              size="small"
-              type="date"
-              label="Từ ngày (CDATE_START)"
-              InputLabelProps={{ shrink: true }}
-              value={cdateStart}
-              onChange={(e) => setCdateStart(e.target.value)}
-              sx={{ minWidth: 160 }}
-            />
-            <TextField
-              size="small"
-              type="date"
-              label="Đến ngày (CDATE_END)"
-              InputLabelProps={{ shrink: true }}
-              value={cdateEnd}
-              onChange={(e) => setCdateEnd(e.target.value)}
-              sx={{ minWidth: 160 }}
-            />
-          </Stack>
+          <TextField
+            size="small"
+            label="Tìm kiếm"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="Mã đơn vị, tên, endpoint..."
+            sx={{ maxWidth: 380 }}
+          />
           <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto">
             {tabConfig.map((t) => (
               <Tab key={t.label} label={t.label} icon={<Iconify icon={t.icon} width={18} />} iconPosition="start" />

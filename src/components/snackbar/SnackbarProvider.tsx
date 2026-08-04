@@ -8,6 +8,7 @@ import { useSettingsContext } from '../settings';
 import Iconify, { IconifyProps } from '../iconify';
 //
 import StyledNotistack from './styles';
+import { SnackbarUtilsConfigurator } from './SnackbarUtils';
 
 // ----------------------------------------------------------------------
 
@@ -52,6 +53,7 @@ export default function SnackbarProvider({ children }: Props) {
           </IconButton>
         )}
       >
+        <SnackbarUtilsConfigurator />
         {children}
       </NotistackProvider>
     </>

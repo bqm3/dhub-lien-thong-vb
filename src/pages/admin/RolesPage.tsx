@@ -14,7 +14,8 @@ import {
   Typography,
 } from '@mui/material';
 import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
-import { dmCategoryApi, DMCategoryItem, getDefaultDateRange } from '../../services/dmCategoryApi';
+import { dmCategoryApi, DMCategoryItem } from '../../services/dmCategoryApi';
+import { getDefaultDateRange } from '../../services/getDefaultDateRange';
 
 type RoleRecord = {
   code: string;
@@ -75,7 +76,7 @@ export default function RolesPage() {
         searchField: parentCodeFilter ? { PARENT_CODE: parentCodeFilter } : {},
       });
       if (res.data) {
-        const mapped: RoleRecord[] = res.data.map((item) => ({
+        const mapped: RoleRecord[] = res.data.map((item: any) => ({
           code: item.code,
           numericId: item.id,
           name: item.name,

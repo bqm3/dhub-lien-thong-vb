@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   Box,
   Button,
@@ -6,24 +7,25 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
+  Grid
 } from '@mui/material';
-import { DataTable, GridRow, MetricCard, PageShell, SectionCard, StatusChip } from '../../sections/interoperability/components';
-import { dmCategoryApi, DMCategoryItem, getDefaultDateRange } from '../../services/dmCategoryApi';
+import Iconify from '../../components/iconify';
+import { DataTable, GridRow, MetricCard, PageShell, SectionCard } from '../../sections/interoperability/components';
+import { dmCategoryApi, DMCategoryItem } from '../../services/dmCategoryApi';
+import { getDefaultDateRange } from '../../services/getDefaultDateRange';
+import { formatTime } from '../../utils/formatTime';
+import { isApiSuccess } from '../../utils/axios';
+import useLoading from '../../hooks/useLoading';
 
 type CategoryRecord = {
   id: string;
   numericId?: number;
-  group:
-    | 'Loại văn bản'
-    | 'Độ khẩn'
-    | 'Độ mật'
-    | 'Lĩnh vực'
-    | 'Trạng thái'
-    | 'Hình thức gửi/nhận';
+  description: string;
   code: string;
   name: string;
   parentCode: string;
@@ -31,11 +33,11 @@ type CategoryRecord = {
   updatedAt: string;
 };
 
-const DEFAULT_PARENT_CODE = 'DANH_MUC';
+const DEFAULT_PARENT_CODE = '';
 
 const emptyForm: CategoryRecord = {
   id: '',
-  group: 'Loại văn bản',
+  description: '',
   code: '',
   name: '',
   parentCode: DEFAULT_PARENT_CODE,
@@ -44,81 +46,114 @@ const emptyForm: CategoryRecord = {
 };
 
 export default function CategoriesPage() {
+  const { showLoading, hideLoading } = useLoading();
+  const queryClient = useQueryClient();
   const defaultDates = useMemo(() => getDefaultDateRange(), []);
   const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
   const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
   const [parentCodeFilter, setParentCodeFilter] = useState(DEFAULT_PARENT_CODE);
 
-  const [rows, setRows] = useState<CategoryRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Pagination states
+  const [pageIndex, setPageIndex] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [keyword, setKeyword] = useState('');
   const [openEditor, setOpenEditor] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<CategoryRecord>(emptyForm);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Fetch API DM_CATEGORY với filter PARENT_CODE = DANH_MUC
-  useEffect(() => {
-    fetchCategories();
-  }, [cdateStart, cdateEnd, parentCodeFilter]);
-
-  async function fetchCategories() {
-    setLoading(true);
-    try {
+  // TanStack Query: Fetch Categories with Server-side API Pagination and keepPreviousData to prevent flicker
+  const { data, isFetching, refetch } = useQuery<{ rows: CategoryRecord[]; total: number }>({
+    queryKey: ['categories', pageIndex, pageSize, cdateStart, cdateEnd, parentCodeFilter],
+    queryFn: async () => {
       const res = await dmCategoryApi.getList({
-        pageIndex: 1,
-        pageSize: 200,
+        pageIndex,
+        pageSize,
         cdateStart,
         cdateEnd,
         searchField: parentCodeFilter ? { PARENT_CODE: parentCodeFilter } : {},
       });
-      if (res.data) {
-        const mapped: CategoryRecord[] = res.data.map((item) => ({
-          id: item.id ? `CAT-${item.id}` : item.code,
-          numericId: item.id,
-          group: (item.description as any) || 'Loại văn bản',
-          code: item.code,
-          name: item.name,
-          parentCode: item.parentCode || parentCodeFilter,
-          status: item.isActive === 1 ? 'Active' : 'Inactive',
-          updatedAt: item.cdate || new Date().toLocaleDateString('vi-VN'),
-        }));
-        setRows(mapped);
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      const total = res?.TotalRecords ?? res?.totalRecords ?? res?.TotalCount ?? res?.totalCount ?? (rawList ? rawList.length : 0);
+      if (!rawList) return { rows: [], total: 0 };
+      const mapped: CategoryRecord[] = rawList.map((item: any) => ({
+        id: item.ID || item.id ? `CAT-${item.ID || item.id}` : (item.CODE || item.code),
+        numericId: item.ID || item.id,
+        description: item.DESCRIPTION || item.description || '',
+        code: item.CODE || item.code || '',
+        name: item.NAME || item.name || '',
+        parentCode: item.PARENT_CODE || item.parentCode || parentCodeFilter,
+        status: (item.IS_ACTIVE !== undefined ? item.IS_ACTIVE : item.isActive) === 1 ? 'Active' : 'Inactive',
+        updatedAt: formatTime(item.CDATE || item.cdate || item.createdDate || item.CREATED_DATE),
+      }));
+      return { rows: mapped, total };
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  const rows = data?.rows || [];
+  const totalCount = data?.total || 0;
+
+  // TanStack Mutation: Save Category
+  const saveMutation = useMutation({
+    mutationFn: (apiItem: DMCategoryItem) => dmCategoryApi.createOrUpdate(apiItem),
+    onMutate: () => showLoading(),
+    onSettled: () => hideLoading(),
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        queryClient.invalidateQueries({ queryKey: ['categories'] });
+        refetch();
+        setOpenEditor(false);
       }
-    } catch (err) {
-      console.warn('Backend API DM_CATEGORY unavailable', err);
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+  });
+
+  // TanStack Mutation: Delete Category
+  const deleteMutation = useMutation({
+    mutationFn: (numericId: number) => dmCategoryApi.delete(numericId),
+    onMutate: () => showLoading(),
+    onSettled: () => hideLoading(),
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        queryClient.invalidateQueries({ queryKey: ['categories'] });
+        refetch();
+      }
+      setDeletingId(null);
+    },
+  });
 
   const filtered = useMemo(() => {
     const q = keyword.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter(
-      (item) =>
+      (item: CategoryRecord) =>
         item.id.toLowerCase().includes(q) ||
-        item.group.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
         item.code.toLowerCase().includes(q) ||
         item.name.toLowerCase().includes(q) ||
         item.status.toLowerCase().includes(q)
     );
   }, [keyword, rows]);
 
-  const tableRows = filtered.map((item) => ({
-    group: item.group,
+  const tableRows = filtered.map((item: CategoryRecord) => ({
+    description: item.description,
     code: item.code,
     name: item.name,
-    status: <StatusChip status={item.status} />,
-    updatedAt: item.updatedAt,
+    status: item.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng',
+    updatedAt: formatTime(item.updatedAt),
     actions: (
-      <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <Button size="small" onClick={() => handleEdit(item)}>
-          Sửa
-        </Button>
-        <Button size="small" color="error" onClick={() => setDeletingId(item.id)}>
-          Xóa
-        </Button>
+      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+        <Tooltip title="Sửa">
+          <IconButton size="small" color="primary" onClick={() => handleEdit(item)}>
+            <Iconify icon="solar:pen-bold" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Xóa">
+          <IconButton size="small" color="error" onClick={() => setDeletingId(item.id)}>
+            <Iconify icon="solar:trash-bin-trash-bold" />
+          </IconButton>
+        </Tooltip>
       </Stack>
     ),
   }));
@@ -127,9 +162,8 @@ export default function CategoriesPage() {
     setEditingId(null);
     setFormValues({
       ...emptyForm,
-      id: `CAT-${String(Date.now()).slice(-6)}`,
       parentCode: parentCodeFilter || DEFAULT_PARENT_CODE,
-      updatedAt: new Date().toLocaleString('vi-VN'),
+      updatedAt: formatTime(new Date()),
     });
     setOpenEditor(true);
   }
@@ -140,7 +174,7 @@ export default function CategoriesPage() {
     setOpenEditor(true);
   }
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!formValues.code || !formValues.name) return;
 
     const apiItem: DMCategoryItem = {
@@ -148,63 +182,52 @@ export default function CategoriesPage() {
       code: formValues.code,
       name: formValues.name,
       parentCode: formValues.parentCode || parentCodeFilter || DEFAULT_PARENT_CODE,
-      description: formValues.group,
+      description: formValues.description,
       isActive: formValues.status === 'Active' ? 1 : 0,
       status: 1,
     };
 
-    const res = await dmCategoryApi.createOrUpdate(apiItem);
-    if (res.success) {
-      await fetchCategories();
-      setOpenEditor(false);
-    } else {
-      alert(`Lỗi API /DM_CATEGORY/Create: ${res.message}`);
-    }
+    saveMutation.mutate(apiItem);
   }
 
-  async function handleConfirmDelete() {
+  function handleConfirmDelete() {
     if (!deletingId) return;
-    const target = rows.find((r) => r.id === deletingId);
+    const target = rows.find((r: CategoryRecord) => r.id === deletingId);
 
     if (target?.numericId) {
-      const res = await dmCategoryApi.delete(target.numericId);
-      if (!res.success) {
-        alert(`Lỗi xóa API: ${res.message}`);
-        return;
-      }
+      deleteMutation.mutate(target.numericId);
+    } else {
+      setDeletingId(null);
     }
-
-    setRows((prev) => prev.filter((item) => item.id !== deletingId));
-    setDeletingId(null);
   }
 
   return (
     <PageShell
       title="Danh mục dùng chung"
-      subtitle="Quản lý danh mục: loại văn bản, độ khẩn/mật, lĩnh vực, trạng thái, hình thức gửi/nhận. Lọc và lưu mặc định PARENT_CODE = DANH_MUC."
+      subtitle="Quản lý danh mục: loại văn bản, độ khẩn, độ mật, lĩnh vực, trạng thái và hình thức gửi/nhận."
     >
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
         <MetricCard
           label="Tổng mục"
-          value={rows.length}
-          helper={`Filter PARENT_CODE: ${parentCodeFilter}`}
+          value={totalCount}
+          helper="Tất cả danh mục hệ thống"
           icon="solar:widget-2-bold"
         />
         <MetricCard
           label="Nhóm danh mục"
-          value={new Set(rows.map((r) => r.group)).size}
-          helper="Group theo nghiệp vụ"
+          value={new Set(rows.map((r: CategoryRecord) => r.parentCode)).size}
+          helper="Phân nhóm theo nhóm cha"
           icon="solar:category-bold"
         />
         <MetricCard
-          label="Đang active"
-          value={rows.filter((r) => r.status === 'Active').length}
-          helper="Dùng cho dropdown/filter"
+          label="Đang dùng"
+          value={rows.filter((r: CategoryRecord) => r.status === 'Active').length}
+          helper="Sử dụng cho hệ thống"
           icon="solar:checklist-bold"
         />
         <MetricCard
           label="Ngưng dùng"
-          value={rows.filter((r) => r.status === 'Inactive').length}
+          value={rows.filter((r: CategoryRecord) => r.status === 'Inactive').length}
           helper="Ẩn khỏi lựa chọn"
           icon="solar:eye-closed-bold"
         />
@@ -212,11 +235,11 @@ export default function CategoriesPage() {
 
       <SectionCard
         title="Danh sách danh mục"
-        subtitle="Màn hình danh mục kết nối API DM_CATEGORY."
+        subtitle="Danh sách các danh mục dùng chung của hệ thống."
         action={
           <Stack direction="row" spacing={1}>
-            <Button variant="outlined" onClick={fetchCategories} disabled={loading}>
-              {loading ? 'Đang tải...' : 'Làm mới (API)'}
+            <Button variant="outlined" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? 'Đang tải...' : 'Làm mới'}
             </Button>
             <Button variant="contained" onClick={handleOpenCreate}>
               Thêm danh mục
@@ -231,33 +254,42 @@ export default function CategoriesPage() {
               label="Tìm kiếm"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              placeholder="Nhóm, mã, tên, trạng thái"
+              placeholder="Nội dung, mã, tên, trạng thái"
               sx={{ flex: 1 }}
             />
             <TextField
               size="small"
-              label="Mã nhóm (PARENT_CODE)"
+              label="Mã nhóm cha"
               value={parentCodeFilter}
-              onChange={(e) => setParentCodeFilter(e.target.value)}
-              placeholder="Mặc định DANH_MUC"
+              onChange={(e) => {
+                setParentCodeFilter(e.target.value);
+                setPageIndex(1);
+              }}
+              placeholder="Nhập mã nhóm cha"
               sx={{ minWidth: 200 }}
             />
             <TextField
               size="small"
               type="date"
-              label="Từ ngày (CDATE_START)"
+              label="Từ ngày"
               InputLabelProps={{ shrink: true }}
               value={cdateStart}
-              onChange={(e) => setCdateStart(e.target.value)}
+              onChange={(e) => {
+                setCdateStart(e.target.value);
+                setPageIndex(1);
+              }}
               sx={{ minWidth: 160 }}
             />
             <TextField
               size="small"
               type="date"
-              label="Đến ngày (CDATE_END)"
+              label="Đến ngày"
               InputLabelProps={{ shrink: true }}
               value={cdateEnd}
-              onChange={(e) => setCdateEnd(e.target.value)}
+              onChange={(e) => {
+                setCdateEnd(e.target.value);
+                setPageIndex(1);
+              }}
               sx={{ minWidth: 160 }}
             />
           </Stack>
@@ -265,7 +297,7 @@ export default function CategoriesPage() {
           <Box sx={{ overflowX: 'auto' }}>
             <DataTable
               columns={[
-                { key: 'group', label: 'Nhóm' },
+                { key: 'description', label: 'Nội dung' },
                 { key: 'code', label: 'Mã' },
                 { key: 'name', label: 'Tên' },
                 { key: 'status', label: 'Trạng thái', align: 'center' },
@@ -273,6 +305,15 @@ export default function CategoriesPage() {
                 { key: 'actions', label: 'Thao tác', align: 'right' },
               ]}
               rows={tableRows}
+              loading={isFetching}
+              pageIndex={pageIndex}
+              rowsPerPage={pageSize}
+              totalCount={totalCount}
+              onPageChange={(newPage) => setPageIndex(newPage)}
+              onRowsPerPageChange={(newSize) => {
+                setPageSize(newSize);
+                setPageIndex(1);
+              }}
             />
           </Box>
         </Stack>
@@ -283,12 +324,9 @@ export default function CategoriesPage() {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12} md={4}>
-              <TextField fullWidth label="Mã nội bộ" disabled value={formValues.id} />
-            </Grid>
-            <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="PARENT_CODE (Nhóm cha)"
+                label="Mã nhóm cha"
                 value={formValues.parentCode}
                 onChange={(event) => setFormValues((prev) => ({ ...prev, parentCode: event.target.value }))}
               />
@@ -296,20 +334,12 @@ export default function CategoriesPage() {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Nhóm"
-                select
-                value={formValues.group}
+                label="Nội dung"
+                value={formValues.description}
                 onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, group: event.target.value as CategoryRecord['group'] }))
+                  setFormValues((prev) => ({ ...prev, description: event.target.value }))
                 }
-              >
-                <MenuItem value="Loại văn bản">Loại văn bản</MenuItem>
-                <MenuItem value="Độ khẩn">Độ khẩn</MenuItem>
-                <MenuItem value="Độ mật">Độ mật</MenuItem>
-                <MenuItem value="Lĩnh vực">Lĩnh vực</MenuItem>
-                <MenuItem value="Trạng thái">Trạng thái</MenuItem>
-                <MenuItem value="Hình thức gửi/nhận">Hình thức gửi/nhận</MenuItem>
-              </TextField>
+              />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
@@ -321,14 +351,14 @@ export default function CategoriesPage() {
                   setFormValues((prev) => ({ ...prev, status: event.target.value as CategoryRecord['status'] }))
                 }
               >
-                <MenuItem value="Active">Active</MenuItem>
-                <MenuItem value="Inactive">Inactive</MenuItem>
+                <MenuItem value="Active">Hoạt động</MenuItem>
+                <MenuItem value="Inactive">Ngưng dùng</MenuItem>
               </TextField>
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Code"
+                label="Mã danh mục"
                 value={formValues.code}
                 onChange={(event) => setFormValues((prev) => ({ ...prev, code: event.target.value }))}
               />
@@ -336,7 +366,7 @@ export default function CategoriesPage() {
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
-                label="Tên"
+                label="Tên danh mục"
                 value={formValues.name}
                 onChange={(event) => setFormValues((prev) => ({ ...prev, name: event.target.value }))}
               />
@@ -348,7 +378,7 @@ export default function CategoriesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenEditor(false)}>Hủy</Button>
-          <Button variant="contained" onClick={handleSubmit}>
+          <Button variant="contained" onClick={handleSubmit} disabled={saveMutation.isPending}>
             Lưu
           </Button>
         </DialogActions>
@@ -361,7 +391,7 @@ export default function CategoriesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeletingId(null)}>Hủy</Button>
-          <Button color="error" variant="contained" onClick={handleConfirmDelete}>
+          <Button color="error" variant="contained" onClick={handleConfirmDelete} disabled={deleteMutation.isPending}>
             Xóa
           </Button>
         </DialogActions>
