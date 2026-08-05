@@ -3,16 +3,18 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import {
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Grid,
   IconButton,
   MenuItem,
   Stack,
   TextField,
   Tooltip,
-  Grid
+  Typography,
 } from '@mui/material';
 import Iconify from '../../components/iconify';
 import { DataTable, GridRow, MetricCard, PageShell, SectionCard } from '../../sections/interoperability/components';
@@ -26,7 +28,6 @@ type UnitRecord = {
   code: string;
   numericId?: number;
   name: string;
-  level: 'Bộ/Ngành' | 'Tỉnh/Thành phố' | 'Sở/Ban/Ngành' | 'Quận/Huyện' | 'Phòng/Ban';
   parent: string;
   description: string;
   status: 'Active' | 'Inactive';
@@ -38,7 +39,6 @@ const DEFAULT_PARENT_CODE = 'DON_VI';
 const emptyForm: UnitRecord = {
   code: '',
   name: '',
-  level: 'Sở/Ban/Ngành',
   parent: DEFAULT_PARENT_CODE,
   description: '',
   status: 'Active',
@@ -63,6 +63,27 @@ export default function UnitsPage() {
   const [formValues, setFormValues] = useState<UnitRecord>(emptyForm);
   const [deletingCode, setDeletingCode] = useState<string | null>(null);
 
+  // Query danh sách nhóm cha để làm options cho Select
+  const { data: parentCategories = [] } = useQuery<{ code: string; label: string }[]>({
+    queryKey: ['parentCategoryOptions'],
+    queryFn: async () => {
+      const res = await dmCategoryApi.getList({ pageIndex: 1, pageSize: 500 });
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      if (!rawList) return [];
+      const options: { code: string; label: string }[] = [];
+      const seen = new Set<string>();
+      rawList.forEach((item: any) => {
+        const code = item.CODE || item.code;
+        const name = item.NAME || item.name;
+        if (code && !seen.has(code)) {
+          seen.add(code);
+          options.push({ code, label: name ? `${code} - ${name}` : code });
+        }
+      });
+      return options;
+    },
+  });
+
   // TanStack Query: Fetch Units with Server-side API Pagination and keepPreviousData
   const { data, isFetching, refetch } = useQuery<{ rows: UnitRecord[]; total: number }>({
     queryKey: ['units', pageIndex, pageSize, cdateStart, cdateEnd, parentCodeFilter],
@@ -81,7 +102,6 @@ export default function UnitsPage() {
         code: item.CODE || item.code || '',
         numericId: item.ID || item.id,
         name: item.NAME || item.name || '',
-        level: 'Sở/Ban/Ngành',
         parent: item.PARENT_CODE || item.parentCode || parentCodeFilter,
         description: item.DESCRIPTION || item.description || '',
         status: (item.IS_ACTIVE !== undefined ? item.IS_ACTIVE : item.isActive) === 1 ? 'Active' : 'Inactive',
@@ -131,35 +151,44 @@ export default function UnitsPage() {
         unit.description.toLowerCase().includes(q) ||
         unit.code.toLowerCase().includes(q) ||
         unit.name.toLowerCase().includes(q) ||
-        unit.level.toLowerCase().includes(q) ||
         unit.parent.toLowerCase().includes(q) ||
         unit.status.toLowerCase().includes(q)
     );
   }, [keyword, rows]);
 
-  const tableRows = filtered.map((unit: UnitRecord) => ({
-    description: unit.description,
-    code: unit.code,
-    name: unit.name,
-    level: unit.level,
-    parent: unit.parent,
-    status: unit.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng',
-    updatedAt: formatTime(unit.updatedAt),
-    actions: (
-      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-        <Tooltip title="Sửa">
-          <IconButton size="small" color="primary" onClick={() => handleEdit(unit)}>
-            <Iconify icon="solar:pen-bold" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Xóa">
-          <IconButton size="small" color="error" onClick={() => setDeletingCode(unit.code)}>
-            <Iconify icon="solar:trash-bin-trash-bold" />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-    ),
-  }));
+  const tableRows = filtered.map((unit: UnitRecord) => {
+    const parentOpt = parentCategories.find((p) => p.code === unit.parent);
+    const parentDisplay = unit.parent && unit.parent !== '0'
+      ? (parentOpt ? parentOpt.label : unit.parent)
+      : '—';
+
+    return {
+      code: <Typography variant="body2" sx={{ fontWeight: 700 }}>{unit.code}</Typography>,
+      name: unit.name,
+      parent: unit.parent && unit.parent !== '0' ? (
+        <Chip label={parentDisplay} size="small" variant="soft" color="info" />
+      ) : (
+        <Typography variant="body2" color="text.disabled">—</Typography>
+      ),
+      description: unit.description || '—',
+      status: unit.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng',
+      updatedAt: formatTime(unit.updatedAt),
+      actions: (
+        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+          <Tooltip title="Sửa">
+            <IconButton size="small" color="primary" onClick={() => handleEdit(unit)}>
+              <Iconify icon="solar:pen-bold" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Xóa">
+            <IconButton size="small" color="error" onClick={() => setDeletingCode(unit.code)}>
+              <Iconify icon="solar:trash-bin-trash-bold" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ),
+    };
+  });
 
   function handleOpenCreate() {
     setEditingCode(null);
@@ -230,10 +259,10 @@ export default function UnitsPage() {
           icon="solar:shield-warning-bold"
         />
         <MetricCard
-          label="Cấp tổ chức"
-          value={new Set(rows.map((u: UnitRecord) => u.level)).size}
-          helper="Phân cấp đơn vị"
-          icon="solar:hierarchy-2-bold"
+          label="Nhóm đơn vị"
+          value={new Set(rows.map((u: UnitRecord) => u.parent)).size}
+          helper="Phân nhóm theo đơn vị cha"
+          icon="solar:category-bold"
         />
       </GridRow>
 
@@ -258,20 +287,28 @@ export default function UnitsPage() {
               label="Tìm kiếm"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              placeholder="Nội dung, mã, tên, cấp, đơn vị cha"
+              placeholder="Nội dung, mã, tên, đơn vị cha"
               sx={{ flex: 1 }}
             />
             <TextField
               size="small"
               label="Mã nhóm cha"
+              select
+              InputLabelProps={{ shrink: true }}
               value={parentCodeFilter}
               onChange={(e) => {
                 setParentCodeFilter(e.target.value);
                 setPageIndex(1);
               }}
-              placeholder="Nhập mã nhóm cha"
               sx={{ minWidth: 200 }}
-            />
+            >
+              <MenuItem value="">Tất cả nhóm cha</MenuItem>
+              {parentCategories.map((opt) => (
+                <MenuItem key={opt.code} value={opt.code}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               size="small"
               type="date"
@@ -301,11 +338,10 @@ export default function UnitsPage() {
           <Box sx={{ overflowX: 'auto' }}>
             <DataTable
               columns={[
-                { key: 'description', label: 'Nội dung' },
                 { key: 'code', label: 'Mã' },
                 { key: 'name', label: 'Tên đơn vị' },
-                { key: 'level', label: 'Cấp' },
                 { key: 'parent', label: 'Mã nhóm cha' },
+                { key: 'description', label: 'Nội dung' },
                 { key: 'status', label: 'Trạng thái', align: 'center' },
                 { key: 'updatedAt', label: 'Cập nhật', align: 'center' },
                 { key: 'actions', label: 'Thao tác', align: 'right' },
@@ -329,15 +365,6 @@ export default function UnitsPage() {
         <DialogTitle>{editingCode ? 'Cập nhật đơn vị' : 'Tạo mới đơn vị'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12} md={12}>
-              <TextField
-                fullWidth
-                label="Nội dung"
-                value={formValues.description}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, description: event.target.value }))}
-                placeholder="Nhập nội dung mô tả đơn vị"
-              />
-            </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -347,7 +374,7 @@ export default function UnitsPage() {
                 onChange={(event) => setFormValues((prev) => ({ ...prev, code: event.target.value }))}
               />
             </Grid>
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
                 label="Tên đơn vị"
@@ -358,26 +385,30 @@ export default function UnitsPage() {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Cấp"
+                label="Mã nhóm cha"
                 select
-                value={formValues.level}
-                onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, level: event.target.value as UnitRecord['level'] }))
-                }
+                InputLabelProps={{ shrink: true }}
+                value={formValues.parent || ''}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, parent: event.target.value }))}
+                SelectProps={{ displayEmpty: true }}
               >
-                <MenuItem value="Bộ/Ngành">Bộ/Ngành</MenuItem>
-                <MenuItem value="Tỉnh/Thành phố">Tỉnh/Thành phố</MenuItem>
-                <MenuItem value="Sở/Ban/Ngành">Sở/Ban/Ngành</MenuItem>
-                <MenuItem value="Quận/Huyện">Quận/Huyện</MenuItem>
-                <MenuItem value="Phòng/Ban">Phòng/Ban</MenuItem>
+                <MenuItem value="">
+                  <em>-- Không chọn (Mặc định) --</em>
+                </MenuItem>
+                {parentCategories.map((opt) => (
+                  <MenuItem key={opt.code} value={opt.code}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
-                label="Mã nhóm cha"
-                value={formValues.parent}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, parent: event.target.value }))}
+                label="Nội dung"
+                value={formValues.description}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, description: event.target.value }))}
+                placeholder="Nhập nội dung mô tả đơn vị"
               />
             </Grid>
             <Grid item xs={12} md={4}>
@@ -394,9 +425,11 @@ export default function UnitsPage() {
                 <MenuItem value="Inactive">Ngưng dùng</MenuItem>
               </TextField>
             </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth label="Thời điểm cập nhật" value={formValues.updatedAt} disabled />
-            </Grid>
+            {editingCode && (
+              <Grid item xs={12}>
+                <TextField fullWidth label="Thời điểm cập nhật" value={formValues.updatedAt} disabled />
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>

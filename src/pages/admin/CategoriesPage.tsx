@@ -12,7 +12,9 @@ import {
   Stack,
   TextField,
   Tooltip,
-  Grid
+  Grid,
+  Chip,
+  Typography
 } from '@mui/material';
 import Iconify from '../../components/iconify';
 import { DataTable, GridRow, MetricCard, PageShell, SectionCard } from '../../sections/interoperability/components';
@@ -62,6 +64,27 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<CategoryRecord>(emptyForm);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Query danh sách danh mục để làm options cho Select Mã nhóm cha
+  const { data: parentCategories = [] } = useQuery<{ code: string; label: string }[]>({
+    queryKey: ['parentCategoryOptions'],
+    queryFn: async () => {
+      const res = await dmCategoryApi.getList({ pageIndex: 1, pageSize: 500 });
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      if (!rawList) return [];
+      const options: { code: string; label: string }[] = [];
+      const seen = new Set<string>();
+      rawList.forEach((item: any) => {
+        const code = item.CODE || item.code;
+        const name = item.NAME || item.name;
+        if (code && !seen.has(code)) {
+          seen.add(code);
+          options.push({ code, label: name ? `${code} - ${name}` : code });
+        }
+      });
+      return options;
+    },
+  });
 
   // TanStack Query: Fetch Categories with Server-side API Pagination and keepPreviousData to prevent flicker
   const { data, isFetching, refetch } = useQuery<{ rows: CategoryRecord[]; total: number }>({
@@ -136,27 +159,39 @@ export default function CategoriesPage() {
     );
   }, [keyword, rows]);
 
-  const tableRows = filtered.map((item: CategoryRecord) => ({
-    description: item.description,
-    code: item.code,
-    name: item.name,
-    status: item.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng',
-    updatedAt: formatTime(item.updatedAt),
-    actions: (
-      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-        <Tooltip title="Sửa">
-          <IconButton size="small" color="primary" onClick={() => handleEdit(item)}>
-            <Iconify icon="solar:pen-bold" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Xóa">
-          <IconButton size="small" color="error" onClick={() => setDeletingId(item.id)}>
-            <Iconify icon="solar:trash-bin-trash-bold" />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-    ),
-  }));
+  const tableRows = filtered.map((item: CategoryRecord) => {
+    const parentOpt = parentCategories.find((p) => p.code === item.parentCode);
+    const parentDisplay = item.parentCode && item.parentCode !== '0'
+      ? (parentOpt ? parentOpt.label : item.parentCode)
+      : '—';
+
+    return {
+      code: <Typography variant="body2" sx={{ fontWeight: 700 }}>{item.code}</Typography>,
+      name: item.name,
+      parentCode: item.parentCode && item.parentCode !== '0' ? (
+        <Chip label={parentDisplay} size="small" variant="soft" color="info" />
+      ) : (
+        <Typography variant="body2" color="text.disabled">—</Typography>
+      ),
+      description: item.description || '—',
+      status: item.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng',
+      updatedAt: formatTime(item.updatedAt),
+      actions: (
+        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+          <Tooltip title="Sửa">
+            <IconButton size="small" color="primary" onClick={() => handleEdit(item)}>
+              <Iconify icon="solar:pen-bold" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Xóa">
+            <IconButton size="small" color="error" onClick={() => setDeletingId(item.id)}>
+              <Iconify icon="solar:trash-bin-trash-bold" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ),
+    };
+  });
 
   function handleOpenCreate() {
     setEditingId(null);
@@ -260,14 +295,22 @@ export default function CategoriesPage() {
             <TextField
               size="small"
               label="Mã nhóm cha"
+              select
+              InputLabelProps={{ shrink: true }}
               value={parentCodeFilter}
               onChange={(e) => {
                 setParentCodeFilter(e.target.value);
                 setPageIndex(1);
               }}
-              placeholder="Nhập mã nhóm cha"
               sx={{ minWidth: 200 }}
-            />
+            >
+              <MenuItem value="">Tất cả nhóm cha</MenuItem>
+              {parentCategories.map((opt) => (
+                <MenuItem key={opt.code} value={opt.code}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               size="small"
               type="date"
@@ -297,9 +340,10 @@ export default function CategoriesPage() {
           <Box sx={{ overflowX: 'auto' }}>
             <DataTable
               columns={[
-                { key: 'description', label: 'Nội dung' },
                 { key: 'code', label: 'Mã' },
-                { key: 'name', label: 'Tên' },
+                { key: 'name', label: 'Tên danh mục' },
+                { key: 'parentCode', label: 'Danh mục cha' },
+                { key: 'description', label: 'Nội dung' },
                 { key: 'status', label: 'Trạng thái', align: 'center' },
                 { key: 'updatedAt', label: 'Cập nhật', align: 'center' },
                 { key: 'actions', label: 'Thao tác', align: 'right' },
@@ -326,12 +370,42 @@ export default function CategoriesPage() {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Mã nhóm cha"
-                value={formValues.parentCode}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, parentCode: event.target.value }))}
+                label="Mã danh mục"
+                required
+                value={formValues.code}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, code: event.target.value }))}
               />
             </Grid>
             <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Tên danh mục"
+                required
+                value={formValues.name}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, name: event.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Mã nhóm cha"
+                select
+                InputLabelProps={{ shrink: true }}
+                value={formValues.parentCode || ''}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, parentCode: event.target.value }))}
+                SelectProps={{ displayEmpty: true }}
+              >
+                <MenuItem value="">
+                  <em>-- Không chọn (Mặc định) --</em>
+                </MenuItem>
+                {parentCategories.map((opt) => (
+                  <MenuItem key={opt.code} value={opt.code}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
                 label="Nội dung"
@@ -355,25 +429,11 @@ export default function CategoriesPage() {
                 <MenuItem value="Inactive">Ngưng dùng</MenuItem>
               </TextField>
             </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Mã danh mục"
-                value={formValues.code}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, code: event.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={8}>
-              <TextField
-                fullWidth
-                label="Tên danh mục"
-                value={formValues.name}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, name: event.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth label="Thời điểm cập nhật" value={formValues.updatedAt} disabled />
-            </Grid>
+            {editingId && (
+              <Grid item xs={12}>
+                <TextField fullWidth label="Thời điểm cập nhật" value={formValues.updatedAt} disabled />
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>
