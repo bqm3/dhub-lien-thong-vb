@@ -11,8 +11,8 @@ import {
   useTheme,
 } from '@mui/material';
 import { StatusChip } from '../../sections/interoperability/components';
-import SignatureStudio from '../../sections/workflow/components/SignatureStudio';
-import { getAttachmentDisplayName, getDemoAttachmentUrl } from './documentHelpers';
+import SignatureStudio from '../../components/file-viewer/SignatureStudio';
+import { getS3AttachmentUrl } from '../../services/storageS3Api';
 import { ManagedDocumentRecord } from './types';
 
 type Props = {
@@ -33,6 +33,9 @@ export default function DocumentSignDialog({
   const theme = useTheme();
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
 
+  const firstFile = formValues?.attachments?.[0];
+  const firstFileName = typeof firstFile === 'string' ? firstFile : firstFile?.originalFileName || firstFile?.name || '';
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth={isSmDown ? 'lg' : 'xl'} fullScreen={isSmDown}>
       <DialogTitle>
@@ -40,18 +43,22 @@ export default function DocumentSignDialog({
           <Box>
             <Typography variant="h6">Giao diện ký số văn bản</Typography>
             <Typography variant="body2" color="text.secondary">
-              {formValues.code} · {formValues.attachments[0] ? getAttachmentDisplayName(formValues.attachments[0]) : 'Chưa có file'}
+              {formValues?.code || ''} · {firstFileName || 'Chưa có file'}
             </Typography>
           </Box>
-          <StatusChip status={formValues.signStatus} />
+          <StatusChip status={(formValues as any)?.signStatus || 'Chưa ký'} />
         </Stack>
       </DialogTitle>
       <DialogContent dividers sx={{ p: isSmDown ? 1.5 : undefined }}>
         <SignatureStudio
-          files={formValues.attachments.map((item) => ({
-            fileName: getAttachmentDisplayName(item),
-            fileUrl: formAttachmentPreviewUrls[item] ?? getDemoAttachmentUrl(formValues.code, item),
-          }))}
+          files={(formValues?.attachments || []).map((item: any) => {
+            const fileName = typeof item === 'string' ? item : item?.originalFileName || item?.name || '';
+            const objectKey = typeof item === 'string' ? item : item?.objectKey || item?.OBJECT_KEY || fileName;
+            return {
+              fileName,
+              fileUrl: (fileName && formAttachmentPreviewUrls?.[fileName]) ?? getS3AttachmentUrl(objectKey || fileName) ?? '',
+            };
+          })}
           onSignComplete={(signatures) => onSignComplete(signatures.length)}
         />
       </DialogContent>

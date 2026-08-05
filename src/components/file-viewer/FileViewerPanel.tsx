@@ -6,9 +6,12 @@ import Iconify from '../iconify';
 import { usePdfViewer } from '../../hooks/usePdfViewer';
 import ViewerPanel from './ViewerPanel';
 
+import { formatFileSize } from '../../services/storageS3Api';
+
 export type FileViewerItem = {
   name: string;
   url: string;
+  size?: number;
 };
 
 type FileViewerPanelProps = {
@@ -68,7 +71,6 @@ function FileViewerPanel({ files, height = 620, showFileList = true, headers, em
           sx={{
             border: '1px solid',
             borderColor: 'divider',
-            borderRadius: 2,
             bgcolor: 'background.paper',
             p: 1.5,
             maxHeight: height,
@@ -100,7 +102,6 @@ function FileViewerPanel({ files, height = 620, showFileList = true, headers, em
                     cursor: 'pointer',
                     border: '1px solid',
                     borderColor: isActive ? 'primary.main' : 'divider',
-                    borderRadius: 1.5,
                     bgcolor: isActive ? 'primary.lighter' : 'background.neutral',
                   }}
                 >
@@ -110,17 +111,28 @@ function FileViewerPanel({ files, height = 620, showFileList = true, headers, em
                       width={18}
                       sx={{ mt: 0.25, color: isActive ? 'primary.main' : 'text.secondary' }}
                     />
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        display: 'block',
-                        wordBreak: 'break-word',
-                        fontWeight: isActive ? 700 : 500,
-                        color: isActive ? 'primary.darker' : 'text.primary',
-                      }}
-                    >
-                      {file.name}
-                    </Typography>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: 'block',
+                          wordBreak: 'break-word',
+                          fontWeight: isActive ? 700 : 500,
+                          color: isActive ? 'primary.darker' : 'text.primary',
+                        }}
+                      >
+                        {file.name}
+                      </Typography>
+                      {file.size !== undefined && file.size !== null && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontSize: '0.7rem', display: 'block', mt: 0.25 }}
+                        >
+                          {formatFileSize(file.size)}
+                        </Typography>
+                      )}
+                    </Box>
                   </Stack>
                 </Box>
               );
@@ -160,6 +172,7 @@ function FileViewerPanel({ files, height = 620, showFileList = true, headers, em
           onDocumentLoadSuccess={viewer.onDocumentLoadSuccess}
           onPageLoadSuccess={viewer.onPageLoadSuccess}
           onDocumentLoadError={viewer.onDocumentLoadError}
+          onRetry={viewer.retryLoad}
         />
       </Box>
     </Box>

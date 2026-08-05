@@ -1,4 +1,4 @@
-import React, { memo, useRef, useEffect } from 'react';
+import React, { memo, useRef, useEffect, useState, lazy, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -6,6 +6,8 @@ import {
   Button,
   Pagination,
   CircularProgress,
+  Skeleton,
+  Stack,
   Tooltip,
   useTheme,
 } from '@mui/material';
@@ -15,25 +17,132 @@ import DownloadIcon from '@mui/icons-material/Download';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 // React PDF
-import { Document, Page, pdfjs } from 'react-pdf';
+import { pdfjs } from 'react-pdf';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
-// Configure PDF worker
+// Configure PDF worker using local bundle
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url
-  ).toString();
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 }
 
 // DocViewer
-import DocViewer, { DocViewerRenderers } from '@cyntler/react-doc-viewer';
+import { DocViewerRenderers } from '@cyntler/react-doc-viewer';
 import '@cyntler/react-doc-viewer/dist/index.css';
+
+import { renderAsync } from 'docx-preview';
 
 import { IOpenedDoc } from '../../hooks/usePdfViewer';
 
-// DocViewer MUI SX style to replace HTML style tags
+// Lazy-load heavy rendering components
+const LazyDocument = lazy(() => import('react-pdf').then((mod) => ({ default: mod.Document })));
+const LazyPage = lazy(() => import('react-pdf').then((mod) => ({ default: mod.Page })));
+const LazyDocViewer = lazy(() => import('@cyntler/react-doc-viewer'));
+
+export interface DocViewerFile {
+  uri: string;
+  fileName?: string;
+  fileType?: string;
+}
+
+function DocxViewer({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error('Không thể nạp tệp Word');
+        return res.arrayBuffer();
+      })
+      .then(async (buffer) => {
+        if (isCancelled || !containerRef.current) return;
+        containerRef.current.innerHTML = '';
+        await renderAsync(buffer, containerRef.current, undefined, {
+          className: 'docx',
+          inWrapper: true,
+          ignoreWidth: false,
+          ignoreHeight: false,
+          breakPages: true,
+          experimental: true,
+        });
+        if (!isCancelled) setLoading(false);
+      })
+      .catch((err) => {
+        if (isCancelled) return;
+        console.error('Lỗi khi render docx-preview:', err);
+        setError('Không thể hiển thị xem trước tệp Word (.docx). Vui lòng tải về máy để xem.');
+        setLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [url]);
+
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        height: '100%',
+        bgcolor: '#f8fafc',
+        borderRadius: 1.5,
+        border: '1px solid #e2e8f0',
+        overflow: 'auto',
+        position: 'relative',
+        p: 2.5,
+      }}
+    >
+      {loading && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, gap: 2 }}>
+          <CircularProgress size={36} />
+          <Typography variant="body2" color="text.secondary">
+            Đang nạp xem trước tệp Word (.docx)...
+          </Typography>
+        </Box>
+      )}
+      {error && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4, color: 'error.main' }}>
+          <Typography variant="body2">{error}</Typography>
+        </Box>
+      )}
+      <Box
+        ref={containerRef}
+        sx={{
+          display: loading || error ? 'none' : 'flex',
+          justifyContent: 'center',
+          width: '100%',
+          '& .docx-wrapper': {
+            bgcolor: 'transparent',
+            padding: '0 !important',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2.5,
+            width: '100%',
+          },
+          '& .docx-wrapper > section.docx': {
+            bgcolor: 'white !important',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1) !important',
+            borderRadius: '4px !important',
+            margin: '0 auto 16px auto !important',
+            maxWidth: '100%',
+          },
+        }}
+      />
+    </Box>
+  );
+}
+
 const DOC_VIEWER_SX = {
   width: '100%',
   height: '100%',
@@ -54,20 +163,20 @@ const DOC_VIEWER_SX = {
     flexDirection: 'column',
   },
   '& .doc-viewer-wrapper #react-doc-viewer, .doc-viewer-wrapper #react-doc-viewer > div, .doc-viewer-wrapper #proxy-renderer, .doc-viewer-wrapper #msdoc-renderer, .doc-viewer-wrapper #pdf-renderer, .doc-viewer-wrapper #txt-renderer, .doc-viewer-wrapper #csv-renderer, .doc-viewer-wrapper #html-renderer':
-    {
-      height: '100% !important',
-      width: '100% !important',
-      flex: '1 !important',
-      display: 'flex !important',
-      flexDirection: 'column !important',
-    },
+  {
+    height: '100% !important',
+    width: '100% !important',
+    flex: '1 !important',
+    display: 'flex !important',
+    flexDirection: 'column !important',
+  },
   '& .doc-viewer-wrapper iframe, .doc-viewer-wrapper #msdoc-iframe, .doc-viewer-wrapper #pdf-iframe, .doc-viewer-wrapper #html-body':
-    {
-      height: '100% !important',
-      width: '100% !important',
-      border: 'none !important',
-      flex: '1 !important',
-    },
+  {
+    height: '100% !important',
+    width: '100% !important',
+    border: 'none !important',
+    flex: '1 !important',
+  },
 };
 
 interface DocTabBarProps {
@@ -176,6 +285,7 @@ const DocTabBar = memo<DocTabBarProps>(({ openedDocs, activePdfUrl, onSelectTab,
             </Typography>
             <IconButton
               size="small"
+              aria-label={`Đóng ${doc.name}`}
               onClick={(e) => onCloseTab(doc.url, e)}
               sx={{
                 p: 0.15,
@@ -234,7 +344,7 @@ const ViewerToolbar = memo<ViewerToolbarProps>(
         {isPdf && (
           <>
             <Tooltip title="Thu nhỏ" PopperProps={{ sx: { zIndex: 1800 } }}>
-              <IconButton size="small" onClick={zoomOut}>
+              <IconButton size="small" aria-label="Thu nhỏ" onClick={zoomOut}>
                 <ZoomOutIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -242,20 +352,20 @@ const ViewerToolbar = memo<ViewerToolbarProps>(
               {Math.round(scale * 100)}%
             </Typography>
             <Tooltip title="Phóng to" PopperProps={{ sx: { zIndex: 1800 } }}>
-              <IconButton size="small" onClick={zoomIn}>
+              <IconButton size="small" aria-label="Phóng to" onClick={zoomIn}>
                 <ZoomInIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </>
         )}
         <Tooltip title="Tải xuống" PopperProps={{ sx: { zIndex: 1800 } }}>
-          <IconButton size="small" onClick={handleDownload} disabled={!securedPdfUrl}>
+          <IconButton size="small" aria-label="Tải xuống" onClick={handleDownload} disabled={!securedPdfUrl}>
             <DownloadIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         {isPdf && (
           <Tooltip title="Xoay" PopperProps={{ sx: { zIndex: 1800 } }}>
-            <IconButton size="small" onClick={rotateClockwise}>
+            <IconButton size="small" aria-label="Xoay" onClick={rotateClockwise}>
               <RotateRightIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -263,30 +373,34 @@ const ViewerToolbar = memo<ViewerToolbarProps>(
       </Box>
 
       {isPdf && securedPdfUrl && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {numPages > 0 && (
-            <Pagination
-              count={numPages}
-              page={currentPage}
-              onChange={handlePageChange}
-              size="small"
-              color="primary"
-            />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: 32 }}>
+          {numPages > 0 ? (
+            <>
+              <Pagination
+                count={numPages}
+                page={currentPage}
+                onChange={handlePageChange}
+                size="small"
+                color="primary"
+              />
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}
+              >
+                {`${numPages} trang`}
+              </Typography>
+            </>
+          ) : (
+            <Skeleton variant="rounded" width={130} height={26} animation="wave" />
           )}
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}
-          >
-            {numPages > 0 ? `${numPages} trang` : 'Đang tải...'}
-          </Typography>
         </Box>
       )}
     </Box>
   )
 );
 
-interface PdfViewerPanelProps {
+export interface ViewerPanelProps {
   openedDocs: IOpenedDoc[];
   activePdfUrl: string | null;
   activePdfName: string;
@@ -294,7 +408,7 @@ interface PdfViewerPanelProps {
   fileExt: string;
   isPdf: boolean;
   isDocViewerSupported: boolean;
-  docs: any[];
+  docs: DocViewerFile[];
   headers: Record<string, string> | undefined;
   scale: number;
   rotation: number;
@@ -314,11 +428,12 @@ interface PdfViewerPanelProps {
   onDocumentLoadSuccess: (data: { numPages: number }) => void;
   onPageLoadSuccess: (page: any) => void;
   onDocumentLoadError: (error: Error) => void;
+  onRetry?: () => void;
   tabBarLeftAction?: React.ReactNode;
   embedded?: boolean;
 }
 
-const ViewerPanel: React.FC<PdfViewerPanelProps> = ({
+const ViewerPanel: React.FC<ViewerPanelProps> = ({
   openedDocs,
   activePdfUrl,
   activePdfName,
@@ -346,11 +461,29 @@ const ViewerPanel: React.FC<PdfViewerPanelProps> = ({
   onDocumentLoadSuccess,
   onPageLoadSuccess,
   onDocumentLoadError,
+  onRetry,
   tabBarLeftAction = null,
   embedded = false,
 }) => {
   const theme = useTheme();
-  const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'].indexOf(fileExt) !== -1;
+  const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'].includes(fileExt);
+
+  const [firstPageHeight, setFirstPageHeight] = useState<number | null>(null);
+
+  const handleFirstPageLoad = (page: any) => {
+    try {
+      const viewport = page.getViewport ? page.getViewport({ scale: 1 }) : null;
+      const baseHeight = viewport?.height || page.height || page.originalHeight || 820;
+      setFirstPageHeight(baseHeight);
+    } catch {
+      setFirstPageHeight(820);
+    }
+    onPageLoadSuccess(page);
+  };
+
+  const basePageHeight = firstPageHeight ?? 820;
+  const estimatedPageHeight = basePageHeight * scale;
+
   return (
     <Box
       sx={{
@@ -400,7 +533,7 @@ const ViewerPanel: React.FC<PdfViewerPanelProps> = ({
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
-          p: embedded ? 1.5 : 2,
+          p: 2,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -422,35 +555,33 @@ const ViewerPanel: React.FC<PdfViewerPanelProps> = ({
               style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
             />
           </Box>
-        ) : isDocViewerSupported && securedPdfUrl ? (
-          <Box
-            sx={{
-              ...DOC_VIEWER_SX,
-              ...(embedded
-                ? {
-                    borderRadius: 0,
-                    boxShadow: 'none',
-                    border: 'none',
-                    bgcolor: 'transparent',
-                  }
-                : null),
-            }}
-          >
+        ) : fileExt === '.docx' && securedPdfUrl ? (
+          <DocxViewer url={securedPdfUrl} />
+        ) : isDocViewerSupported && securedPdfUrl && docs.length > 0 ? (
+          <Box sx={DOC_VIEWER_SX}>
             <div className="doc-viewer-wrapper">
-              <DocViewer
-                documents={docs}
-                pluginRenderers={DocViewerRenderers}
-                prefetchMethod="GET"
-                requestHeaders={headers}
-                config={{
-                  header: {
-                    disableHeader: true,
-                    disableFileName: true,
-                    retainURLParams: true,
-                  },
-                }}
-                style={{ width: '100%', height: '100%' }}
-              />
+              <Suspense
+                fallback={
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 6 }}>
+                    <CircularProgress size={36} />
+                  </Box>
+                }
+              >
+                <LazyDocViewer
+                  documents={docs}
+                  pluginRenderers={DocViewerRenderers}
+                  prefetchMethod="GET"
+                  requestHeaders={headers}
+                  config={{
+                    header: {
+                      disableHeader: true,
+                      disableFileName: true,
+                      retainURLParams: true,
+                    },
+                  }}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </Suspense>
             </div>
           </Box>
         ) : isPdf && securedPdfUrl ? (
@@ -464,104 +595,148 @@ const ViewerPanel: React.FC<PdfViewerPanelProps> = ({
             }}
           >
             {pdfError ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', color: 'error.main', p: 4 }}>
-                <Typography>{pdfError}</Typography>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'error.main',
+                  p: 4,
+                  gap: 2,
+                  textAlign: 'center',
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {pdfError}
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  {onRetry && (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      size="small"
+                      onClick={onRetry}
+                      startIcon={<RefreshIcon />}
+                      sx={{ textTransform: 'none', borderRadius: 1.5 }}
+                    >
+                      Thử tải lại
+                    </Button>
+                  )}
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    size="small"
+                    onClick={handleDownload}
+                    startIcon={<DownloadIcon />}
+                    sx={{ textTransform: 'none', borderRadius: 1.5 }}
+                  >
+                    Tải xuống tệp
+                  </Button>
+                </Stack>
               </Box>
             ) : (
-              <Document
-                file={securedPdfUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={onDocumentLoadError}
-                loading={
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      py: 6,
-                      gap: 2,
-                    }}
-                  >
+              <Suspense
+                fallback={
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 6 }}>
                     <CircularProgress size={36} />
-                    {loadTimeout && (
-                      <Box sx={{ textAlign: 'center', px: 2 }}>
-                        <Typography
-                          variant="caption"
-                          color="warning.main"
-                          display="block"
-                          sx={{ fontWeight: 600, mb: 1 }}
-                        >
-                          Tải tài liệu đang mất nhiều thời gian hơn bình thường...
-                        </Typography>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="warning"
-                          startIcon={<DownloadIcon />}
-                          onClick={handleDownload}
-                          sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: '0.75rem' }}
-                        >
-                          Tải xuống trực tiếp để xem
-                        </Button>
-                      </Box>
-                    )}
                   </Box>
                 }
               >
-                {Array.from({ length: numPages || 0 }, (_, i) => {
-                  const page = i + 1;
-                  const inBuffer = Math.abs(page - currentPage) <= 2;
-                  const estimatedPageHeight = 820 * scale;
-
-                  return (
+                <LazyDocument
+                  file={securedPdfUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={
                     <Box
-                      key={page}
-                      id={`pdf-page-${page}`}
                       sx={{
-                        mb: 1.5,
-                        boxShadow: inBuffer ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
-                        borderRadius: 0.5,
-                        overflow: 'hidden',
-                        bgcolor: inBuffer ? 'white' : 'transparent',
                         display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
                         justifyContent: 'center',
-                        minHeight: inBuffer ? 'auto' : `${estimatedPageHeight}px`,
-                        height: inBuffer ? 'auto' : `${estimatedPageHeight}px`,
-                        width: '100%',
+                        py: 6,
+                        gap: 2,
                       }}
                     >
-                      {inBuffer ? (
-                        <Page
-                          pageNumber={page}
-                          scale={scale}
-                          rotate={(pdfBaseRotation + rotation) % 360}
-                          renderTextLayer={false}
-                          renderAnnotationLayer={false}
-                          onLoadSuccess={i === 0 ? onPageLoadSuccess : undefined}
-                        />
-                      ) : (
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            height: '100%',
-                            bgcolor: '#f8fafc',
-                            width: '100%',
-                            border: '1px dashed #cbd5e1',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          <Typography variant="caption" color="text.secondary">
-                            Đang tải trang {page}...
+                      <CircularProgress size={36} />
+                      {loadTimeout && (
+                        <Box sx={{ textAlign: 'center', px: 2 }}>
+                          <Typography
+                            variant="caption"
+                            color="warning.main"
+                            display="block"
+                            sx={{ fontWeight: 600, mb: 1 }}
+                          >
+                            Tải tài liệu đang mất nhiều thời gian hơn bình thường...
                           </Typography>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                            startIcon={<DownloadIcon />}
+                            onClick={handleDownload}
+                            sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: '0.75rem' }}
+                          >
+                            Tải xuống trực tiếp để xem
+                          </Button>
                         </Box>
                       )}
                     </Box>
-                  );
-                })}
-              </Document>
+                  }
+                >
+                  {Array.from({ length: numPages || 0 }, (_, i) => {
+                    const page = i + 1;
+                    const inBuffer = Math.abs(page - currentPage) <= 2;
+
+                    return (
+                      <Box
+                        key={page}
+                        id={`pdf-page-${page}`}
+                        sx={{
+                          mb: 1.5,
+                          boxShadow: inBuffer ? '0 2px 8px rgba(0,0,0,0.12)' : 'none',
+                          borderRadius: 0.5,
+                          overflow: 'hidden',
+                          bgcolor: inBuffer ? 'white' : 'transparent',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          minHeight: inBuffer ? 'auto' : `${estimatedPageHeight}px`,
+                          height: inBuffer ? 'auto' : `${estimatedPageHeight}px`,
+                          width: '100%',
+                        }}
+                      >
+                        {inBuffer ? (
+                          <LazyPage
+                            pageNumber={page}
+                            scale={scale}
+                            rotate={(pdfBaseRotation + rotation) % 360}
+                            renderTextLayer={false}
+                            renderAnnotationLayer={false}
+                            onLoadSuccess={i === 0 ? handleFirstPageLoad : undefined}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              height: '100%',
+                              bgcolor: '#f8fafc',
+                              width: '100%',
+                              border: '1px dashed #cbd5e1',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            <Typography variant="caption" color="text.secondary">
+                              Đang tải trang {page}...
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </LazyDocument>
+              </Suspense>
             )}
           </Box>
         ) : securedPdfUrl ? (

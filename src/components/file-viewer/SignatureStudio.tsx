@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import axiosInstance, { DEFAULT_TOKEN } from '../../utils/axios';
 import {
   Alert,
   Box,
@@ -17,14 +18,13 @@ import {
 } from '@mui/material';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { useSnackbar } from 'notistack';
-import Iconify from '../../../components/iconify';
-import { PlacedSignature } from '../workflowTypes';
+import Iconify from '../iconify';
+
+
+
 
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url
-  ).toString();
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 }
 
 const SIGNATURE_SIZE = { width: 200, height: 100 };
@@ -37,6 +37,19 @@ const SIGNATURE_SCALE_STEP = 0.1;
 const MIN_SIGNATURE_SCALE = 0.5;
 const MAX_SIGNATURE_SCALE = 2;
 const PDF_BASE_WIDTH = 595;
+
+export type SignatureType = 'initial' | 'main' | 'stamp';
+
+type PlacedSignature = {
+  id: string;
+  type: SignatureType;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  page: number;
+};
 
 type PageDimensions = {
   width: number;
@@ -121,6 +134,49 @@ export default function SignatureStudio({
   const isImage = Boolean(previewUrl && !isPdf && /\.(png|jpe?g|gif|webp)$/i.test(uploadedName));
   const openTabs = fileList.filter((item) => openTabIds.indexOf(item.id) !== -1);
 
+  const pdfFileProp = useMemo(() => {
+    if (!previewUrl) return null;
+    if (previewUrl.startsWith('blob:') || previewUrl.startsWith('data:')) {
+      return previewUrl;
+    }
+    const token = DEFAULT_TOKEN
+
+    const authHeader = token && typeof token === 'string' && token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    return {
+      url: previewUrl,
+      httpHeaders: { Authorization: authHeader },
+      withCredentials: false,
+    };
+  }, [previewUrl]);
+
+  const [securedImageUrl, setSecuredImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!previewUrl || isPdf) {
+      setSecuredImageUrl(null);
+      return;
+    }
+    if (previewUrl.startsWith('blob:') || previewUrl.startsWith('data:')) {
+      setSecuredImageUrl(previewUrl);
+      return;
+    }
+    let isCancelled = false;
+    axiosInstance
+      .get(previewUrl, { responseType: 'blob' })
+      .then((res) => {
+        if (isCancelled) return;
+        const blobUrl = URL.createObjectURL(res.data);
+        setSecuredImageUrl(blobUrl);
+      })
+      .catch(() => {
+        if (isCancelled) return;
+        setSecuredImageUrl(previewUrl);
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [previewUrl, isPdf]);
+
   const loadFileContent = useCallback((item: SignatureFileItem) => {
     setActiveFileId(item.id);
     setUploadedName(item.fileName);
@@ -180,12 +236,12 @@ export default function SignatureStudio({
     const nextFiles =
       files && files.length > 0
         ? files
-            .filter((item) => item.fileName)
-            .map((item, index) => ({
-              id: `prop_${index}_${item.fileName}`,
-              fileName: item.fileName,
-              fileUrl: item.fileUrl || '',
-            }))
+          .filter((item) => item.fileName)
+          .map((item, index) => ({
+            id: `prop_${index}_${item.fileName}`,
+            fileName: item.fileName,
+            fileUrl: item.fileUrl || '',
+          }))
         : fileName
           ? [{ id: `prop_0_${fileName}`, fileName, fileUrl: fileUrl || '' }]
           : [];
@@ -537,7 +593,7 @@ export default function SignatureStudio({
       }}
     >
       <Document
-        file={previewUrl}
+        file={pdfFileProp}
         onLoadSuccess={handleDocumentLoadSuccess}
         onLoadError={handleDocumentLoadError}
         loading={
@@ -566,12 +622,6 @@ export default function SignatureStudio({
             if (previewOnly) return;
             handleDocumentClick(event, currentPage);
           }}
-          loading={
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, p: 4 }}>
-              <CircularProgress size={40} />
-              <Typography>Đang tải trang...</Typography>
-            </Box>
-          }
           renderTextLayer={false}
           renderAnnotationLayer={false}
         />
@@ -598,7 +648,7 @@ export default function SignatureStudio({
       }}
     >
       <img
-        src={previewUrl ?? undefined}
+        src={securedImageUrl || previewUrl || undefined}
         alt={uploadedName}
         onLoad={handleImageLoad}
         style={{
@@ -866,25 +916,6 @@ export default function SignatureStudio({
             {previewUrl && isImage && renderImageViewer()}
             {previewUrl && !isPdf && !isImage && (
               <Alert severity="warning">Định dạng file chưa hỗ trợ preview. Vui lòng dùng PDF hoặc ảnh.</Alert>
-            )}
-
-            {previewUrl && isLoading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 2,
-                  bgcolor: 'rgba(255,255,255,0.7)',
-                  zIndex: 5,
-                }}
-              >
-                <CircularProgress size={40} />
-                <Typography>Đang tải tài liệu...</Typography>
-              </Box>
             )}
           </Box>
 

@@ -33,38 +33,8 @@ import { getDefaultDateRange } from '../../services/getDefaultDateRange';
 import { formatTime } from '../../utils/formatTime';
 import { isApiSuccess } from '../../utils/axios';
 import useLoading from '../../hooks/useLoading';
-
-export type ManagedDocumentRecord = {
-  numericId?: number;
-  id?: number;
-  code: string;           // CODE
-  messageId?: string;      // MESSAGE_ID
-  documentNo: string;      // DOCUMENT_NO
-  documentType: string;    // DOCUMENT_TYPE
-  subject: string;         // SUBJECT
-  senderCode: string;      // SENDER_CODE
-  senderName: string;      // SENDER_NAME
-  status: string;          // STATUS
-  createdAt: string;       // CDATE
-  attachments?: {
-    id?: number;
-    originalFileName: string;
-    objectKey: string;
-    fileSize?: number;
-    contentType?: string;
-  }[];
-};
-
-const emptyDocumentForm: ManagedDocumentRecord = {
-  code: '',
-  documentNo: '',
-  documentType: '',
-  subject: '',
-  senderCode: '',
-  senderName: '',
-  status: '1',
-  createdAt: formatTime(new Date()),
-};
+import DocumentDetailDialog from './DocumentDetailDialog';
+import { ManagedDocumentRecord, emptyDocumentForm } from './types';
 
 function getFileExtensionInfo(filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -177,22 +147,37 @@ export default function DocumentManagementPage() {
   });
 
   // TanStack Query: Fetch Detail & Attachments for Detail Dialog via DOCUMENTS/GetInfo/{id}
-  const { data: detailDocAttachments } = useQuery({
-    queryKey: ['documentAttachments', detailDoc?.numericId || detailDoc?.id],
+  const { data: detailFullDoc } = useQuery({
+    queryKey: ['documentDetail', detailDoc?.numericId || detailDoc?.id],
     enabled: Boolean(detailDoc?.numericId || detailDoc?.id),
     queryFn: async () => {
       const docId = detailDoc?.numericId || detailDoc?.id;
-      if (!docId) return [];
+      if (!docId) return null;
       const res = await documentsApi.getInfo(docId);
       const infoData = res?.Data || res?.data;
+      if (!infoData) return null;
       const list = infoData?.DOCUMENT_ATTACHMENT || infoData?.document_attachment || infoData?.DocumentAttachment || [];
-      return list.map((item: any) => ({
+      const attachments = list.map((item: any) => ({
         id: item.ID || item.id,
         originalFileName: item.ORIGINAL_FILE_NAME || item.originalFileName || 'File_dinh_kem.pdf',
         objectKey: item.OBJECT_KEY || item.objectKey || '',
         fileSize: item.FILE_SIZE || item.fileSize || 0,
         contentType: item.CONTENT_TYPE || item.contentType || 'application/pdf',
       }));
+      return {
+        numericId: infoData.ID || infoData.id,
+        id: infoData.ID || infoData.id,
+        code: infoData.CODE || infoData.code || '',
+        messageId: infoData.MESSAGE_ID || infoData.messageId || '',
+        documentNo: infoData.DOCUMENT_NO || infoData.documentNo || '',
+        documentType: infoData.DOCUMENT_TYPE || infoData.documentType || '',
+        subject: infoData.SUBJECT || infoData.subject || '',
+        senderCode: infoData.SENDER_CODE || infoData.senderCode || '',
+        senderName: infoData.SENDER_NAME || infoData.senderName || '',
+        status: String(infoData.STATUS ?? infoData.status ?? '1'),
+        createdAt: formatTime(infoData.CDATE || infoData.cdate),
+        attachments,
+      } as ManagedDocumentRecord;
     },
   });
 
@@ -490,139 +475,14 @@ export default function DocumentManagementPage() {
       </SectionCard>
 
       {/* Dialog Chi tiết */}
-      <Dialog open={Boolean(detailDoc)} onClose={() => setDetailDoc(null)} fullWidth maxWidth="md">
-        {detailDoc && (
-          <>
-            <DialogTitle>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <Iconify icon="solar:document-bold" width={24} sx={{ color: 'primary.main' }} />
-                <Typography variant="h6">Chi tiết văn bản: {detailDoc.documentNo}</Typography>
-              </Stack>
-            </DialogTitle>
-            <DialogContent dividers>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption" color="text.secondary">Mã văn bản</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{detailDoc.code}</Typography>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption" color="text.secondary">Số ký hiệu</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{detailDoc.documentNo}</Typography>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption" color="text.secondary">Loại văn bản</Typography>
-                  <Typography variant="body2">{detailDoc.documentType}</Typography>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption" color="text.secondary">Mã cơ quan gửi</Typography>
-                  <Typography variant="body2">{detailDoc.senderCode}</Typography>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption" color="text.secondary">Tên cơ quan gửi</Typography>
-                  <Typography variant="body2">{detailDoc.senderName}</Typography>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption" color="text.secondary">Trạng thái</Typography>
-                  <Typography variant="body2">{detailDoc.status === '1' || detailDoc.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng'}</Typography>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="caption" color="text.secondary">Thời gian tạo</Typography>
-                  <Typography variant="body2">{detailDoc.createdAt}</Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary">Trích yếu</Typography>
-                  <Typography variant="body2">{detailDoc.subject}</Typography>
-                </Grid>
-
-                {/* Danh sách tệp đính kèm của văn bản */}
-                <Grid item xs={12}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1, mb: 1.5 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Tệp đính kèm ({detailDocAttachments?.length || 0})
-                    </Typography>
-                  </Stack>
-                  {detailDocAttachments && detailDocAttachments.length > 0 ? (
-                    <Grid container spacing={1.5}>
-                      {detailDocAttachments.map((att: any) => {
-                        const fileInfo = getFileExtensionInfo(att.originalFileName);
-                        return (
-                          <Grid item xs={12} sm={6} key={att.id || att.originalFileName}>
-                            <Paper
-                              variant="outlined"
-                              sx={{
-                                p: 1.75,
-                                borderRadius: 2,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                transition: 'all 0.2s ease',
-                                '&:hover': {
-                                  borderColor: 'primary.main',
-                                  boxShadow: (theme) => theme.customShadows?.z4 || '0 4px 12px rgba(0,0,0,0.06)',
-                                },
-                              }}
-                            >
-                              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1, mr: 1 }}>
-                                <Box
-                                  sx={{
-                                    width: 42,
-                                    height: 42,
-                                    borderRadius: 1.5,
-                                    bgcolor: fileInfo.bg,
-                                    color: fileInfo.color,
-                                    display: 'grid',
-                                    placeItems: 'center',
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <Iconify icon={fileInfo.icon} width={24} />
-                                </Box>
-                                <Box sx={{ minWidth: 0, flex: 1 }}>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      fontWeight: 600,
-                                      whiteSpace: 'nowrap',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                    }}
-                                  >
-                                    {att.originalFileName}
-                                  </Typography>
-                                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
-                                    <Chip label={fileInfo.label} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: fileInfo.bg, color: fileInfo.color }} />
-                                    <Typography variant="caption" color="text.secondary">
-                                      {(att.fileSize / 1024).toFixed(1)} KB
-                                    </Typography>
-                                  </Stack>
-                                </Box>
-                              </Stack>
-                              <Tooltip title="Tải tệp tin">
-                                <IconButton size="small" color="primary" sx={{ bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08) }}>
-                                  <Iconify icon="solar:download-bold" width={18} />
-                                </IconButton>
-                              </Tooltip>
-                            </Paper>
-                          </Grid>
-                        );
-                      })}
-                    </Grid>
-                  ) : (
-                    <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderRadius: 2, bgcolor: (theme) => alpha(theme.palette.grey[500], 0.03) }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Chưa có tệp đính kèm nào.
-                      </Typography>
-                    </Paper>
-                  )}
-                </Grid>
-              </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setDetailDoc(null)}>Đóng</Button>
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
+      <DocumentDetailDialog
+        doc={detailDoc ? (detailFullDoc || detailDoc) : null}
+        onClose={() => setDetailDoc(null)}
+        onDocumentUpdated={() => {
+          queryClient.invalidateQueries({ queryKey: ['documents'] });
+          refetch();
+        }}
+      />
 
       {/* Dialog Tạo mới / Cập nhật thiết kế hiện đại, tinh gọn */}
       <Dialog
