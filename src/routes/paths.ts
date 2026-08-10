@@ -20,7 +20,7 @@ export const PATH_DASHBOARD = {
   root: ROOTS_DASHBOARD,
   /** Alias đăng nhập xong → báo cáo tổng quan */
   overview: path(ROOTS_DASHBOARD, '/operations/reporting/executive'),
-  integration: path(ROOTS_DASHBOARD, '/integration-management'),
+  integration: path(ROOTS_DASHBOARD, '/admin/units'),
   documents: path(ROOTS_DASHBOARD, '/document-management'),
   exchange: path(ROOTS_DASHBOARD, '/operations/document-exchange'),
   admin: {

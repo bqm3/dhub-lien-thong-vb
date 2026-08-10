@@ -159,6 +159,7 @@ export default function DocumentManagementPage() {
       const list = infoData?.DOCUMENT_ATTACHMENT || infoData?.document_attachment || infoData?.DocumentAttachment || [];
       const attachments = list.map((item: any) => ({
         id: item.ID || item.id,
+        code: item.CODE || item.code || '',
         originalFileName: item.ORIGINAL_FILE_NAME || item.originalFileName || 'File_dinh_kem.pdf',
         objectKey: item.OBJECT_KEY || item.objectKey || '',
         fileSize: item.FILE_SIZE || item.fileSize || 0,
@@ -359,24 +360,28 @@ export default function DocumentManagementPage() {
           value={totalCount}
           helper="Tất cả văn bản trong hệ thống"
           icon="solar:documents-bold"
+          backgroundColor="#01AD65"
         />
         <MetricCard
           label="Đang hoạt động"
           value={documentList.filter((d) => d.status === '1' || d.status === 'Active').length}
           helper="Văn bản sử dụng"
           icon="solar:shield-check-bold"
+          backgroundColor="#028EDD"
         />
         <MetricCard
           label="Ngưng dùng"
           value={documentList.filter((d) => d.status !== '1' && d.status !== 'Active').length}
           helper="Ngưng hoạt động"
           icon="solar:shield-warning-bold"
+          backgroundColor="#9E50FE"
         />
         <MetricCard
           label="Loại văn bản"
           value={new Set(documentList.map((d) => d.documentType)).size}
           helper="Phân loại hệ thống"
           icon="solar:category-bold"
+          backgroundColor="#FF8551"
         />
       </GridRow>
 
@@ -475,6 +480,8 @@ export default function DocumentManagementPage() {
       </SectionCard>
 
       {/* Dialog Chi tiết */}
+
+      
       <DocumentDetailDialog
         doc={detailDoc ? (detailFullDoc || detailDoc) : null}
         onClose={() => setDetailDoc(null)}

@@ -25,13 +25,14 @@ export default function Main({ children, sx, ...other }: BoxProps) {
       <Box
         component="main"
         sx={{
-          pt: `${HEADER.H_MOBILE + SPACING}px`,
-          pb: `${HEADER.H_MOBILE + SPACING}px`,
-          ...(isDesktop && {
-            px: 2,
-            pt: `${HEADER.H_DASHBOARD_DESKTOP + 80}px`,
-            pb: `${HEADER.H_DASHBOARD_DESKTOP + SPACING}px`,
-          }),
+          background: 'rgba(243, 246, 254, 1)',
+          height: `calc(100vh - ${HEADER.H_DASHBOARD_DESKTOP + 48}px)`,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          px: 1.5,
+          pt: 3,
+          pb: 3,
+          mt: `${HEADER.H_DASHBOARD_DESKTOP + 48}px`,
         }}
       >
         {children}
@@ -44,10 +45,16 @@ export default function Main({ children, sx, ...other }: BoxProps) {
       component="main"
       sx={{
         flexGrow: 1,
-        py: `${HEADER.H_MOBILE + SPACING}px`,
+        background: 'rgba(243, 246, 254, 1)',
+        height: `calc(100vh - ${HEADER.H_DASHBOARD_DESKTOP}px)`,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        borderTopLeftRadius: { lg: 12 },
+        px: 1.5,
+        pt: 3,
+        pb: 3,
+        mt: `${HEADER.H_DASHBOARD_DESKTOP}px`,
         ...(isDesktop && {
-          px: 2,
-          py: `${HEADER.H_DASHBOARD_DESKTOP + SPACING}px`,
           width: `calc(100% - ${NAV.W_DASHBOARD}px)`,
           ...(isNavMini && {
             width: `calc(100% - ${NAV.W_DASHBOARD_MINI}px)`,

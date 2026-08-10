@@ -36,57 +36,43 @@ export default function DashboardLayout() {
 
   const renderNavVertical = <NavVertical openNav={open} onCloseNav={handleClose} />;
 
-  if (isNavHorizontal) {
-    return (
-      <>
-        <Header onOpenNav={handleOpen} />
-
-        {isDesktop ? <NavHorizontal /> : renderNavVertical}
-
-        <Main>
-          <Outlet />
-        </Main>
-      </>
-    );
-  }
-
-  if (isNavMini) {
-    return (
-      <>
-        <Header onOpenNav={handleOpen} />
-
-        <Box
-          sx={{
-            display: { lg: 'flex' },
-            minHeight: { lg: 1 },
-          }}
-        >
-          {isDesktop ? <NavMini /> : renderNavVertical}
-
+  return (
+    <Box
+      sx={{
+        height: '100vh',
+        overflow: 'hidden',
+        background: 'linear-gradient(180deg, #004982 0%, #00355E 80.52%)',
+      }}
+    >
+      {isNavHorizontal ? (
+        <>
+          <Header onOpenNav={handleOpen} />
+          {isDesktop ? <NavHorizontal /> : renderNavVertical}
           <Main>
             <Outlet />
           </Main>
-        </Box>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <Header onOpenNav={handleOpen} />
-
-      <Box
-        sx={{
-          display: { lg: 'flex' },
-          minHeight: { lg: 1 },
-        }}
-      >
-        {renderNavVertical}
-
-        <Main>
-          <Outlet />
-        </Main>
-      </Box>
-    </>
+        </>
+      ) : isNavMini ? (
+        <>
+          <Header onOpenNav={handleOpen} />
+          <Box sx={{ display: { lg: 'flex' }, minHeight: { lg: 1 } }}>
+            {isDesktop ? <NavMini /> : renderNavVertical}
+            <Main>
+              <Outlet />
+            </Main>
+          </Box>
+        </>
+      ) : (
+        <>
+          <Header onOpenNav={handleOpen} />
+          <Box sx={{ display: { lg: 'flex' }, minHeight: { lg: 1 } }}>
+            {renderNavVertical}
+            <Main>
+              <Outlet />
+            </Main>
+          </Box>
+        </>
+      )}
+    </Box>
   );
 }

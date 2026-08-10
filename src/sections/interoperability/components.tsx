@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import Iconify from '../../components/iconify';
 import { useSettingsContext } from '../../components/settings';
+import { getDocumentStatusNote } from '../../utils/constants';
 
 type ShellProps = {
   title: string;
@@ -33,6 +34,9 @@ type MetricCardProps = {
   value: string | number;
   helper: string;
   icon: string;
+  backgroundColor?: string;
+  textColor?: string;
+  color?: string;
 };
 
 type SectionCardProps = {
@@ -101,9 +105,9 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
         <title>{title} | GOVS Interop</title>
       </Helmet>
 
-      <Container maxWidth={themeStretch ? false : 'xl'}>
+      <Container maxWidth={false} disableGutters sx={{ px: 1.5 }}>
         <Stack spacing={3}>
-          <Box
+          {/* <Box
             sx={{
               p: 2,
               borderRadius: 2,
@@ -120,7 +124,7 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
             <Typography variant="body1" sx={{ opacity: 0.88 }}>
               {subtitle}
             </Typography>
-          </Box>
+          </Box> */}
 
           {children}
         </Stack>
@@ -129,12 +133,14 @@ export function PageShell({ title, subtitle, children }: ShellProps) {
   );
 }
 
-export function MetricCard({ label, value, helper, icon }: MetricCardProps) {
+export function MetricCard({ label, value, helper, icon, backgroundColor, textColor, color }: MetricCardProps) {
+  const finalTextColor = textColor || color || (backgroundColor ? '#FFFFFF' : undefined);
+
   return (
-    <Card sx={{ p: 3, height: '100%' }}>
+    <Card sx={{ p: 3, height: '100%', backgroundColor, color: finalTextColor }}>
       <Stack spacing={2}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="subtitle2" color="text.secondary">
+          <Typography variant="subtitle2" sx={{ color: finalTextColor || 'text.secondary', opacity: finalTextColor ? 0.9 : 1 }}>
             {label}
           </Typography>
           <Box
@@ -144,16 +150,16 @@ export function MetricCard({ label, value, helper, icon }: MetricCardProps) {
               display: 'grid',
               placeItems: 'center',
               borderRadius: 2,
-              bgcolor: 'primary.lighter',
-              color: 'primary.main',
+              bgcolor: backgroundColor ? 'rgba(255, 255, 255, 0.2)' : 'primary.lighter',
+              color: finalTextColor || 'primary.main',
             }}
           >
             <Iconify icon={icon} width={22} />
           </Box>
         </Stack>
 
-        <Typography variant="h3">{value}</Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="h3" sx={{ color: finalTextColor }}>{value}</Typography>
+        <Typography variant="body2" sx={{ color: finalTextColor || 'text.secondary', opacity: finalTextColor ? 0.85 : 1 }}>
           {helper}
         </Typography>
       </Stack>
@@ -185,16 +191,17 @@ export function SectionCard({ title, subtitle, action, children }: SectionCardPr
 }
 
 export function StatusChip({ status }: { status: string }) {
-  const normalized = status.toLowerCase();
+  const normalized = (status || '').toLowerCase();
+  const displayLabel = getDocumentStatusNote(status);
 
   let color: 'success' | 'warning' | 'error' | 'info' | 'default' = 'default';
 
-  if (['active', 'received', 'ack', 'đã nhận', 'hoàn thành', 'đã khắc phục', 'đạt', 'ổn định'].includes(normalized)) color = 'success';
-  if (['pending', 'retrying', 'waiting', 'đang xử lý', 'đang tạo', 'chờ đơn vị'].includes(normalized)) color = 'warning';
-  if (['failed', 'nack', 'thất bại'].includes(normalized)) color = 'error';
-  if (['sent', 'đã phát hành', 'đang lưu trữ', 'đã gửi lại'].includes(normalized)) color = 'info';
+  if (['active', 'received', 'ack', 'ack_received', 'accept', 'completed', 'đã nhận', 'hoàn thành', 'đã khắc phục', 'đạt', 'ổn định'].includes(normalized)) color = 'success';
+  if (['pending', 'retrying', 'waiting', 'processing', 'routed', 'đang xử lý', 'đang tạo', 'chờ đơn vị'].includes(normalized)) color = 'warning';
+  if (['failed', 'nack', 'cancelled', 'thất bại', 'lỗi'].includes(normalized)) color = 'error';
+  if (['sent', 'created', 'draft', 'signed', 'validated', 'đã phát hành', 'đang lưu trữ', 'đã gửi lại'].includes(normalized)) color = 'info';
 
-  return <Chip label={status} color={color} size="small" variant={color === 'default' ? 'outlined' : 'filled'} />;
+  return <Chip label={displayLabel} color={color} size="small" variant="soft" sx={{ fontWeight: 600 }} />;
 }
 
 export function BulletList({ items }: { items: string[] }) {

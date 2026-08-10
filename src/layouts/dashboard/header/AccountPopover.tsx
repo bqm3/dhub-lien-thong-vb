@@ -51,9 +51,9 @@ export default function AccountPopover() {
 
   const handleLogout = async () => {
     try {
-      logout();
-      navigate(PATH_AUTH.login, { replace: true });
       handleClosePopover();
+      await logout();
+      navigate(PATH_AUTH.login, { replace: true });
     } catch (error) {
       console.error(error);
       enqueueSnackbar('Unable to logout!', { variant: 'error' });

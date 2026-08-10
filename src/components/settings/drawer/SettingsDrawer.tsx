@@ -69,7 +69,14 @@ export default function SettingsDrawer() {
         BackdropProps={{ invisible: true }}
         PaperProps={{
           sx: {
-            ...bgBlur({ color: theme.palette.background.default, opacity: 0.9 }),
+            background: (theme) =>
+              theme.palette.mode === 'dark'
+                ? 'linear-gradient(180deg, #004982 0%, #00355E 80.52%)'
+                : undefined,
+            ...bgBlur({
+              color: theme.palette.mode === 'dark' ? '#004982' : theme.palette.background.default,
+              opacity: 0.9,
+            }),
             width: NAV.W_BASE,
             boxShadow: (theme) =>
               `-24px 12px 40px 0 ${alpha(

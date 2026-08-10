@@ -23,23 +23,20 @@ function NavHorizontal() {
   return (
     <AppBar
       component="nav"
-      color="transparent"
       sx={{
         boxShadow: 0,
         top: HEADER.H_DASHBOARD_DESKTOP_OFFSET,
+        background: 'transparent',
+        borderBottom: 'none',
       }}
     >
       <Toolbar
         sx={{
-          ...bgBlur({
-            color: theme.palette.background.default,
-          }),
+          px: { lg: 5 },
         }}
       >
         <NavSectionHorizontal data={filteredNavConfig} />
       </Toolbar>
-
-      <Shadow />
     </AppBar>
   );
 }

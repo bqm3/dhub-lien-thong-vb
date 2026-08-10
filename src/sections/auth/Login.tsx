@@ -1,47 +1,34 @@
-// @mui
-import { Alert, Tooltip, Stack, Typography, Link, Box } from '@mui/material';
-// hooks
+import { Stack, Button } from '@mui/material';
 import { useAuthContext } from '../../auth/useAuthContext';
-// layouts
 import LoginLayout from '../../layouts/login';
-//
-import AuthLoginForm from './AuthLoginForm';
-import AuthWithSocial from './AuthWithSocial';
 
 // ----------------------------------------------------------------------
 
 export default function Login() {
-  const { method } = useAuthContext();
+  const { loginWithKeycloakSSO } = useAuthContext();
 
   return (
     <LoginLayout>
-      <Stack spacing={2} sx={{ mb: 5, position: 'relative' }}>
-        <Typography variant="h4">Đăng nhập Hệ thống</Typography>
-
-        <Stack direction="row" spacing={0.5}>
-          <Typography variant="body2" color="text.secondary">
-            Cổng thông tin Trục liên thông văn bản
-          </Typography>
-        </Stack>
-
-        <Tooltip title={method} placement="left">
-          <Box
-            component="img"
-            alt={method}
-            src={`/assets/icons/auth/ic_${method}.png`}
-            sx={{ width: 32, height: 32, position: 'absolute', right: 0 }}
-          />
-        </Tooltip>
+      <Stack spacing={3} alignItems="center" sx={{ width: '100%', py: 2 }}>
+        <Button
+          fullWidth
+          onClick={() => loginWithKeycloakSSO?.('EXTERNAL')}
+          sx={{
+            height: 50,
+            borderRadius: '30px',
+            bgcolor: '#2AA7DF',
+            color: 'common.white',
+            fontWeight: 700,
+            fontSize: 18,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
+            '&:hover': {
+              bgcolor: '#1f93c5',
+            },
+          }}
+        >
+          Đăng nhập
+        </Button>
       </Stack>
-
-      <Alert severity="info" sx={{ mb: 3 }}>
-        <Stack spacing={0.5}>
-          <div><strong>1. Admin:</strong> admin@local / admin123</div>
-          <div><strong>2. Đơn vị:</strong> donvi@local / donvi123</div>
-        </Stack>
-      </Alert>
-
-      <AuthLoginForm />
     </LoginLayout>
   );
 }

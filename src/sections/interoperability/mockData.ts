@@ -24,21 +24,50 @@ export type DocumentRecord = {
 };
 
 export type ExchangeTransaction = {
-  id: string;
-  documentCode: string;
-  documentTitle?: string;
+  // Exact Backend API & sendDocument fields
+  id?: any;
+  code?: string;
+  messageId?: string;
+  documentId?: string;
+  documentNo?: string;
   documentType?: string;
-  route: string;
-  sender: string;
+  subject?: string;
+  senderCode?: string;
+  receiverCode?: string | string[];
+  priority?: string;
+  issueDate?: string;
+  sendTime?: string;
+  topicName?: string;
+  sourceSystem?: string;
+  targetSystem?: string;
+  messageType?: string;
+  messagePayload?: string;
+  status?: string | 'sent' | 'received' | 'failed' | 'retrying';
+  retryCount?: number;
+  errorCode?: number;
+  errorMessage?: string;
+  org?: string;
+  cdate?: string;
+  ldate?: string;
+  cuser?: string;
+  luser?: string;
+
+  // FE mapped UI aliases (for UI display compatibility)
+  documentCode?: string;
+  documentTitle?: string;
+  sender?: string;
+  receiver?: string;
+  route?: string;
   senderPerson?: string;
   senderTitle?: string;
-  receiver: string;
-  status: 'sent' | 'received' | 'failed' | 'retrying';
-  ack: 'ACK' | 'NACK' | 'WAITING';
-  retries: number;
+  routes?: any[];
+  attachments?: any[];
+  body?: any[];
+  ack?: string | 'ACK' | 'NACK' | 'WAITING';
+  retries?: number;
   sentAt?: string;
   receivedAt?: string;
-  updatedAt: string;
+  updatedAt?: string;
   errorReason?: string;
   errorDetail?: string;
 };
@@ -274,3 +303,39 @@ export const sampleExchangeResponse = `{
     "BO_TTTT"
   ]
 }`;
+
+export type InternalDoc = {
+  code: string;
+  title: string;
+  fromDept: string;
+  toDept: string;
+  status: string;
+  createdAt: string;
+};
+
+export const internalDocs: InternalDoc[] = [
+  {
+    code: 'VB-NB-000101',
+    title: 'Tờ trình về việc xin phê duyệt ngân sách bảo trì hệ thống CNTT Q3/2026',
+    fromDept: 'Trung tâm CNTT',
+    toDept: 'Ban Cố vấn & HĐQT',
+    status: 'Đang duyệt',
+    createdAt: '05/08/2026 09:30',
+  },
+  {
+    code: 'VB-NB-000102',
+    title: 'Báo cáo công tác liên thông văn bản và nâng cấp cổng API tháng 07',
+    fromDept: 'Phòng Phát triển phần mềm',
+    toDept: 'Ban Giám đốc',
+    status: 'Hoàn thành',
+    createdAt: '04/08/2026 14:15',
+  },
+  {
+    code: 'VB-NB-000103',
+    title: 'Kế hoạch tổ chức diễn tập ứng cứu sự cố an toàn thông tin mạng',
+    fromDept: 'Phòng An toàn thông tin',
+    toDept: 'Toàn bộ các phòng ban',
+    status: 'Soạn thảo',
+    createdAt: '02/08/2026 16:45',
+  },
+];

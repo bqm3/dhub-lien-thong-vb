@@ -42,9 +42,12 @@ export const StyledItem = styled(ListItemButton, {
     display: 'inline-flex',
     textTransform: 'capitalize',
     padding: theme.spacing(0, 0.75),
-    color: theme.palette.text.secondary,
+    color: '#FFFFFF',
     borderRadius: theme.shape.borderRadius,
     height: NAV.H_DASHBOARD_ITEM_HORIZONTAL,
+    '& .MuiListItemIcon-root': {
+      color: '#FFFFFF',
+    },
     '&:hover': hoverStyle,
     // Sub item
     ...(subItem && {
@@ -82,7 +85,8 @@ export const StyledItem = styled(ListItemButton, {
 // ----------------------------------------------------------------------
 
 export const StyledIcon = styled(ListItemIcon)({
-  marginRight: 8,
+  marginRight: 6,
+  minWidth: 28,
   flexShrink: 0,
   width: ICON.NAV_ITEM_HORIZONTAL,
   height: ICON.NAV_ITEM_HORIZONTAL,

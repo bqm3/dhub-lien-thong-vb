@@ -5,6 +5,8 @@ import { GuardedPage } from '../auth/PermissionGuard';
 import CompactLayout from '../layouts/compact';
 import DashboardLayout from '../layouts/dashboard';
 import { PATH_AFTER_LOGIN } from '../config';
+import KeycloakCallbackPage from '../pages/auth/KeycloakCallbackPage';
+import InternalLoginRedirectPage from '../pages/auth/InternalLoginRedirectPage';
 import {
   Page404,
   IntegrationManagementPage,
@@ -41,7 +43,14 @@ export default function Router() {
             </GuestGuard>
           ),
         },
-        { path: 'login/internal', element: <Navigate to={PATH_AFTER_LOGIN} replace /> },
+        {
+          path: 'login/internal',
+          element: <InternalLoginRedirectPage />,
+        },
+        {
+          path: 'auth/keycloak/callback',
+          element: <KeycloakCallbackPage />,
+        },
       ],
     },
     {
@@ -54,7 +63,7 @@ export default function Router() {
       children: [
         { element: <Navigate to={PATH_AFTER_LOGIN} replace />, index: true },
         { path: 'overview', element: <Navigate to={PATH_AFTER_LOGIN} replace /> },
-        { path: 'integration-management', element: <IntegrationManagementPage /> },
+        { path: 'integration-management', element: <Navigate to="/dashboard/admin/units" replace /> },
         { path: 'document-management', element: <DocumentManagementPage /> },
         {
           path: 'admin',

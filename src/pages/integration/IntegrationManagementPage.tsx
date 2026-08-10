@@ -211,24 +211,28 @@ export default function IntegrationManagementPage() {
           value={agencyList.length}
           helper={`${activeAgencies.length} active / ${pendingAgencies.length} pending / ${warningAgencies.length} warning`}
           icon="solar:user-plus-bold"
+          backgroundColor='#01AD65'
         />
         <MetricCard
           label="Client ID đang hoạt động"
           value={activeAgencies.length}
           helper="Cấp theo agencyCode, không trùng lặp"
           icon="solar:key-bold"
+          backgroundColor='#028EDD'
         />
         <MetricCard
           label="Endpoint đang giám sát"
           value={agencyList.length}
           helper="Kiểm tra health mỗi 5 phút"
           icon="solar:global-bold"
+          backgroundColor='#9E50FE'
         />
         <MetricCard
           label="Credential cần gia hạn"
           value={warningAgencies.length}
           helper="Sẽ hết hạn trong 14 ngày tới"
           icon="solar:shield-warning-bold"
+          backgroundColor='#FF8551'
         />
       </GridRow>
 

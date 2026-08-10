@@ -247,24 +247,28 @@ export default function CategoriesPage() {
           value={totalCount}
           helper="Tất cả danh mục hệ thống"
           icon="solar:widget-2-bold"
+          backgroundColor="#01AD65"
         />
         <MetricCard
           label="Nhóm danh mục"
           value={new Set(rows.map((r: CategoryRecord) => r.parentCode)).size}
           helper="Phân nhóm theo nhóm cha"
           icon="solar:category-bold"
+          backgroundColor="#028EDD"
         />
         <MetricCard
           label="Đang dùng"
           value={rows.filter((r: CategoryRecord) => r.status === 'Active').length}
           helper="Sử dụng cho hệ thống"
           icon="solar:checklist-bold"
+          backgroundColor="#9E50FE"
         />
         <MetricCard
           label="Ngưng dùng"
           value={rows.filter((r: CategoryRecord) => r.status === 'Inactive').length}
           helper="Ẩn khỏi lựa chọn"
           icon="solar:eye-closed-bold"
+          backgroundColor="#FF8551"
         />
       </GridRow>
 

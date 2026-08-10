@@ -32,7 +32,8 @@ export default function NavMini() {
           height: 1,
           position: 'fixed',
           width: NAV.W_DASHBOARD_MINI,
-          borderRight: (theme) => `dashed 1px ${theme.palette.divider}`,
+          background: 'transparent',
+          borderRight: 'none',
           ...hideScrollbarX,
         }}
       >

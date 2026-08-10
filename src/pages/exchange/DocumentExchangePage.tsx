@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -15,16 +16,17 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Paper,
   Stack,
   Tab,
   Tabs,
   TextField,
   Typography,
 } from '@mui/material';
-import {
-  ExchangeTransaction,
-  exchangeTransactions,
-} from '../../sections/interoperability/mockData';
+import { useSnackbar } from 'notistack';
+import { useQuery } from '@tanstack/react-query';
+import Iconify from '../../components/iconify';
+import { ExchangeTransaction } from '../../sections/interoperability/mockData';
 import {
   DataTable,
   GridRow,
@@ -33,82 +35,26 @@ import {
   SectionCard,
   StatusChip,
 } from '../../sections/interoperability/components';
-import Iconify from '../../components/iconify';
-
-// ── Kịch bản mẫu chuẩn ──────────────────────────────────────────────
-const SCENARIO_SENDER = {
-  unit: 'UBND Hà Nội',
-  person: 'Nguyễn Văn A',
-  title: 'Phó Chủ tịch UBND Hà Nội',
-};
-const SCENARIO_RECEIVERS = ['Sở Nội vụ', 'Sở Thông tin & Truyền thông'];
-const SCENARIO_FILES = [
-  { name: '123_QD_UBND.pdf', type: 'application/pdf', size: '1.8 MB' },
-  { name: '123_QD_UBND.xml', type: 'application/xml', size: '42 KB' },
-];
-
-type AttachmentPreview = { fileName: string; type: string; size: string };
-
-function AttachmentActionsMenu({
-  file,
-  onPreview,
-}: {
-  file: AttachmentPreview;
-  onPreview: (file: AttachmentPreview) => void;
-}) {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
-
-  return (
-    <>
-      <IconButton size="small" onClick={(event) => setAnchorEl(event.currentTarget)}>
-        <Iconify icon="eva:more-vertical-fill" width={18} />
-      </IconButton>
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <MenuItem
-          onClick={() => {
-            onPreview(file);
-            setAnchorEl(null);
-          }}
-        >
-          <ListItemIcon>
-            <Iconify icon="solar:eye-bold" width={18} />
-          </ListItemIcon>
-          <ListItemText primary="Xem file" />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setAnchorEl(null);
-          }}
-        >
-          <ListItemIcon>
-            <Iconify icon="solar:download-bold" width={18} />
-          </ListItemIcon>
-          <ListItemText primary="Tải xuống" />
-        </MenuItem>
-      </Menu>
-    </>
-  );
-}
+import { documentsApi } from '../../services/documentsApi';
+import { dmCategoryApi } from '../../services/dmCategoryApi';
+import useLoading from '../../hooks/useLoading';
+import { isApiSuccess } from '../../utils/axios';
+import DocumentExchangeDetailDialog from './DocumentExchangeDetailDialog';
+import DocumentExchangeCreateDialog from './DocumentExchangeCreateDialog';
+import { ACK_SUCCESS_STATUSES, FAILED_STATUSES, getDocumentStatusNote } from '../../utils/constants';
 
 function TransactionActionsMenu({
   tx,
   onDetail,
-  onEdit,
   onReplay,
   onDelete,
+  onAck,
 }: {
   tx: ExchangeTransaction;
   onDetail: () => void;
-  onEdit: () => void;
   onReplay: () => void;
   onDelete: () => void;
+  onAck: () => void;
 }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -141,17 +87,19 @@ function TransactionActionsMenu({
           </ListItemIcon>
           <ListItemText primary="Chi tiết" />
         </MenuItem>
+
         <MenuItem
           onClick={() => {
-            onEdit();
+            onAck();
             closeMenu();
           }}
         >
           <ListItemIcon>
-            <Iconify icon="solar:pen-bold" width={18} />
+            <Iconify icon="solar:check-circle-bold" width={18} sx={{ color: 'success.main' }} />
           </ListItemIcon>
-          <ListItemText primary="Sửa" />
+          <ListItemText primary="Xác nhận" />
         </MenuItem>
+
         {canReplay && (
           <MenuItem
             onClick={() => {
@@ -165,7 +113,7 @@ function TransactionActionsMenu({
             <ListItemText primary="Replay" />
           </MenuItem>
         )}
-        <MenuItem
+        {/* <MenuItem
           onClick={() => {
             onDelete();
             closeMenu();
@@ -176,7 +124,7 @@ function TransactionActionsMenu({
             <Iconify icon="solar:trash-bin-trash-bold" width={18} sx={{ color: 'error.main' }} />
           </ListItemIcon>
           <ListItemText primary="Xóa" />
-        </MenuItem>
+        </MenuItem> */}
       </Menu>
     </>
   );
@@ -184,14 +132,22 @@ function TransactionActionsMenu({
 
 const emptyForm: ExchangeTransaction = {
   id: '',
+  documentId: '',
+  documentNo: '',
   documentCode: '',
-  documentTitle: '',
   documentType: 'CONG_VAN',
-  route: '',
+  subject: '',
+  documentTitle: '',
+  senderCode: '',
   sender: '',
+  receiverCode: [],
+  receiver: '',
+  priority: 'NORMAL',
+  sendTime: '',
+  issueDate: '',
+  route: '',
   senderPerson: '',
   senderTitle: '',
-  receiver: '',
   status: 'sent',
   ack: 'WAITING',
   retries: 0,
@@ -202,41 +158,303 @@ const emptyForm: ExchangeTransaction = {
   errorDetail: '',
 };
 
-const DOC_TYPES = ['CONG_VAN', 'QUYET_DINH', 'BAO_CAO', 'THONG_BAO', 'KE_HOACH', 'BIEN_NHAN'];
-
 export default function DocumentExchangePage() {
-  const [list, setList] = useState<ExchangeTransaction[]>(exchangeTransactions);
+  const [list, setList] = useState<ExchangeTransaction[]>([]);
   const [keyword, setKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [openForm, setOpenForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState<ExchangeTransaction>(emptyForm);
   const [detailTx, setDetailTx] = useState<ExchangeTransaction | null>(null);
-  const [detailTab, setDetailTab] = useState(0);
-  const [previewFile, setPreviewFile] = useState<AttachmentPreview | null>(null);
+
+  const { enqueueSnackbar } = useSnackbar();
+  const { showLoading, hideLoading } = useLoading();
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      const res = await documentsApi.getRoutes({});
+      const rawData = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      if (rawData && Array.isArray(rawData)) {
+        const groupMap = new Map<string, any>();
+
+        rawData.forEach((item: any) => {
+          const sCode = item.SENDER_NAME || item.SENDER_CODE || item.SOURCE_SYSTEM || item.senderCode || '';
+          const docNo = item.DOCUMENT_NO || item.documentNo || item.code || '';
+          const sendTime = item.SEND_TIME || item.sendTime || item.CDATE || item.cdate || '';
+          const groupKey = item.MESSAGE_ID || item.messageId || `${docNo}_${sCode}_${sendTime}` || String(item.ID || item.CODE);
+
+          if (!groupMap.has(groupKey)) {
+            groupMap.set(groupKey, {
+              id: item.ID || item.id,
+              code: item.CODE || item.code,
+              messageId: item.MESSAGE_ID || item.messageId,
+              documentId: item.DOCUMENT_ID || item.documentId,
+              documentNo: docNo,
+              documentType: item.DOCUMENT_TYPE || item.documentType || 'CONG_VAN',
+              subject: item.SUBJECT || item.subject || '',
+              senderCode: item.SENDER_CODE || item.senderCode || '',
+              sender: sCode,
+              senderPerson: item.SENDER_PERSON || '',
+              senderTitle: item.SENDER_TITLE || '',
+              priority: item.PRIORITY || item.priority || 'NORMAL',
+              sendTime: sendTime,
+              sentAt: sendTime,
+              issueDate: sendTime,
+              documentCode: docNo,
+              documentTitle: item.SUBJECT || item.subject || '',
+              routes: [],
+            });
+          }
+
+          const group = groupMap.get(groupKey);
+          const rName = item.RECEIVER_NAME || item.RECEIVER_CODE || item.TARGET_SYSTEM || item.receiverCode || '';
+          group.routes.push({
+            id: item.ID || item.id,
+            code: item.CODE || item.code,
+            messageId: item.MESSAGE_ID || item.messageId,
+            receiverCode: item.RECEIVER_CODE || item.receiverCode || '',
+            receiverName: rName,
+            status: (item.STATUS || 'WAITING').toUpperCase(),
+            sendTime: sendTime,
+            receiveTime: item.RECEIVE_TIME || item.receiveTime || '',
+            ackTime: item.ACK_TIME || item.ackTime || '',
+          });
+        });
+
+        const mapped: ExchangeTransaction[] = Array.from(groupMap.values()).map((g: any) => {
+          const receiverNames = g.routes.map((r: any) => r.receiverName).filter(Boolean);
+          const receiverCodes = g.routes.map((r: any) => r.receiverCode).filter(Boolean);
+
+          const isAllAck = g.routes.every((r: any) =>
+            ACK_SUCCESS_STATUSES.includes((r.status || '').toUpperCase())
+          );
+          const hasFailed = g.routes.some((r: any) =>
+            FAILED_STATUSES.includes((r.status || '').toUpperCase())
+          );
+          const hasRetrying = g.routes.some((r: any) =>
+            ['RETRYING'].includes((r.status || '').toUpperCase())
+          );
+
+          let overallStatus = 'waiting';
+          if (isAllAck) overallStatus = 'received';
+          else if (hasFailed) overallStatus = 'failed';
+          else if (hasRetrying) overallStatus = 'retrying';
+
+          return {
+            ...g,
+            receiverCode: receiverCodes,
+            receiver: receiverNames.join(', '),
+            status: overallStatus,
+            ack: isAllAck ? 'ACK' : 'WAITING',
+            retries: g.routes.reduce((acc: number, r: any) => acc + (r.retryCount || 0), 0),
+            updatedAt: g.routes.find((r: any) => r.ackTime)?.ackTime || g.sentAt,
+            route: `${g.sender} -> ${receiverNames.join(', ')}`,
+          };
+        });
+
+        setList(mapped);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  // Fetch danh sách văn bản để chọn trong Dialog Tạo giao dịch
+  const { data: documentOptions = [] } = useQuery({
+    queryKey: ['exchangeDocumentOptions'],
+    queryFn: async () => {
+      const res = await documentsApi.getList({ pageIndex: 1, pageSize: 200 });
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      return rawList.map((doc: any) => ({
+        id: doc.ID || doc.id,
+        code: doc.CODE || doc.code,
+        documentNo: doc.DOCUMENT_NO || doc.documentNo || doc.CODE || '',
+        subject: doc.SUBJECT || doc.subject || '',
+        documentType: doc.DOCUMENT_TYPE || doc.documentType || 'CONG_VAN',
+        senderCode: doc.SENDER_CODE || doc.senderCode || '',
+        senderName: doc.SENDER_NAME || doc.senderName || '',
+      }));
+    },
+  });
+
+  // Fetch danh sách đơn vị để làm Nơi gửi / Nơi nhận (PARENT_CODE = DON_VI và các đơn vị con)
+  const { data: unitOptions = [] } = useQuery({
+    queryKey: ['exchangeUnitOptions'],
+    queryFn: async () => {
+      const res = await dmCategoryApi.getList({ pageIndex: 1, pageSize: 500 });
+      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+
+      // Lọc các đơn vị có PARENT_CODE = DON_VI hoặc là đơn vị con của PARENT_CODE = DON_VI
+      const validUnitCodes = new Set<string>();
+      let addedNew = true;
+      while (addedNew) {
+        addedNew = false;
+        rawList.forEach((item: any) => {
+          const code = String(item.CODE || item.code || '').trim();
+          const parentCode = String(item.PARENT_CODE || item.parentCode || '').trim();
+          if (code && !validUnitCodes.has(code)) {
+            if (parentCode.toUpperCase() === 'DON_VI' || validUnitCodes.has(parentCode)) {
+              validUnitCodes.add(code);
+              addedNew = true;
+            }
+          }
+        });
+      }
+
+      const options: { code: string; label: string }[] = [];
+      const seen = new Set<string>();
+      rawList.forEach((item: any) => {
+        const code = String(item.CODE || item.code || '').trim();
+        const name = String(item.NAME || item.name || '').trim();
+        if (code && validUnitCodes.has(code) && !seen.has(code)) {
+          seen.add(code);
+          options.push({ code, label: name || code });
+        }
+      });
+      return options;
+    },
+  });
+
+
 
   const filtered = useMemo(
     () =>
       list.filter(
         (tx) =>
-          (statusFilter === '' || tx.status === statusFilter) &&
-          (tx.id.toLowerCase().includes(keyword.toLowerCase()) ||
-            tx.documentCode.toLowerCase().includes(keyword.toLowerCase()) ||
-            (tx.documentTitle ?? '').toLowerCase().includes(keyword.toLowerCase()) ||
-            tx.sender.toLowerCase().includes(keyword.toLowerCase()) ||
-            tx.receiver.toLowerCase().includes(keyword.toLowerCase()))
+          String(tx.id || tx.code || '').toLowerCase().includes(keyword.toLowerCase()) ||
+          (tx.documentCode || '').toLowerCase().includes(keyword.toLowerCase()) ||
+          (tx.documentTitle || '').toLowerCase().includes(keyword.toLowerCase()) ||
+          (tx.sender || '').toLowerCase().includes(keyword.toLowerCase()) ||
+          (tx.receiver || '').toLowerCase().includes(keyword.toLowerCase())
       ),
-    [list, keyword, statusFilter]
+    [list, keyword]
   );
 
-  const tableRows = filtered.map((tx) => ({
-    id: (
+
+  function handleDelete(id: string | number) {
+    setList((prev) => prev.filter((tx) => (tx.id || tx.code) !== id));
+  }
+
+  function handleReplay(id: string | number) {
+    setList((prev) =>
+      prev.map((tx) =>
+        (tx.id || tx.code) === id
+          ? { ...tx, status: 'retrying', ack: 'WAITING', retries: (tx.retries || 0) + 1, updatedAt: new Date().toLocaleDateString('vi-VN') }
+          : tx
+      )
+    );
+  }
+
+  const [ackTarget, setAckTarget] = useState<{
+    tx: ExchangeTransaction;
+    receivers: { code: string; name: string; status: string }[];
+    selectedCode: string;
+  } | null>(null);
+
+  async function executeAck(tx: ExchangeTransaction, receiverCode: string) {
+    const docId = String(tx.documentId || tx.id || tx.code || '');
+    if (!docId || !receiverCode) {
+      enqueueSnackbar('Thiếu thông tin mã văn bản hoặc mã đơn vị nhận', { variant: 'warning' });
+      return;
+    }
+
+    try {
+      showLoading();
+      const res = await documentsApi.ackDocument({
+        documentId: docId,
+        receiverCode,
+        status: 'RECEIVED',
+      });
+
+      if (isApiSuccess(res)) {
+        setAckTarget(null);
+        fetchTransactions();
+      }
+    } catch {
+      // ignore
+    } finally {
+      hideLoading();
+    }
+  }
+
+  function handleAck(tx: ExchangeTransaction) {
+    const receivers: { code: string; name: string; status: string }[] =
+      tx.routes && tx.routes.length > 0
+        ? tx.routes.map((r: any) => ({
+            code: r.receiverCode || r.code || '',
+            name: r.receiverName || r.receiverCode || '',
+            status: r.status || 'WAITING',
+          }))
+        : Array.isArray(tx.receiverCode)
+        ? tx.receiverCode.map((c) => ({ code: c, name: c, status: 'WAITING' }))
+        : [{ code: String(tx.receiverCode || ''), name: String(tx.receiver || ''), status: 'WAITING' }];
+
+    if (receivers.length <= 1) {
+      executeAck(tx, receivers[0]?.code || '');
+    } else {
+      setAckTarget({
+        tx,
+        receivers,
+        selectedCode: receivers[0]?.code || '',
+      });
+    }
+  }
+
+  async function handleCreateSubmit(formValues: ExchangeTransaction) {
+    const docNo = formValues.documentNo || formValues.documentCode;
+    const sCode = formValues.senderCode || formValues.sender;
+    const rCodes: string[] = Array.isArray(formValues.receiverCode)
+      ? formValues.receiverCode
+      : typeof formValues.receiverCode === 'string' && formValues.receiverCode
+      ? (formValues.receiverCode as string).split(',').map((s) => s.trim()).filter(Boolean)
+      : typeof formValues.receiver === 'string' && formValues.receiver
+      ? (formValues.receiver as string).split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    const subj = formValues.subject || formValues.documentTitle;
+
+    if (!docNo || !sCode || rCodes.length === 0) {
+      enqueueSnackbar('Vui lòng chọn Số ký hiệu, Nơi gửi và chọn ít nhất 1 Nơi nhận', { variant: 'warning' });
+      return;
+    }
+
+    try {
+      showLoading();
+      const sendRes = await documentsApi.sendDocument({
+        header: {
+          documentId: formValues.documentId || formValues.id,
+          documentNo: docNo,
+          documentType: formValues.documentType || 'CONG_VAN',
+          subject: subj || 'Văn bản liên thông',
+          senderCode: sCode,
+          receiverCode: rCodes,
+          priority: formValues.priority || 'NORMAL',
+          sendTime: formValues.sendTime || formValues.issueDate || new Date().toISOString().split('T')[0],
+          issueDate: formValues.sendTime || formValues.issueDate || new Date().toISOString().split('T')[0],
+        },
+      });
+
+      await fetchTransactions();
+      setOpenForm(false);
+      setTimeout(() => {
+        fetchTransactions();
+      }, 1200);
+    } catch {
+      // ignore
+    } finally {
+      hideLoading();
+    }
+  }
+
+  const tableRows = filtered.map((tx, index) => ({
+    stt: (
       <Typography
         variant="body2"
+        align="center"
         sx={{ cursor: 'pointer', color: 'primary.main', fontWeight: 600 }}
-        onClick={() => { setDetailTx(tx); setDetailTab(0); }}
+        onClick={() => { setDetailTx(tx); }}
       >
-        {tx.id}
+        {index + 1}
       </Typography>
     ),
     documentCode: (
@@ -257,65 +475,45 @@ export default function DocumentExchangePage() {
         )}
       </Stack>
     ),
-    receiver: <Typography variant="body2">{tx.receiver}</Typography>,
+    receiver: (
+      <Stack spacing={0.5} alignItems="flex-start" sx={{ py: 0.5 }}>
+        {tx.routes && tx.routes.length > 0 ? (
+          tx.routes.map((r: any, idx: number) => {
+            const sUpper = (r.status || '').toUpperCase();
+            const isAck = ACK_SUCCESS_STATUSES.includes(sUpper);
+            const isFailed = FAILED_STATUSES.includes(sUpper);
+            const color = isAck ? 'success' : isFailed ? 'error' : 'warning';
+            const icon = isAck ? 'solar:check-circle-bold' : isFailed ? 'solar:danger-bold' : 'solar:clock-circle-bold';
+            const statusText = getDocumentStatusNote(r.status);
+
+            return (
+              <Chip
+                key={r.id || idx}
+                icon={<Iconify icon={icon} width={13} />}
+                label={`${r.receiverName || r.receiverCode} (${statusText})`}
+                size="small"
+                color={color}
+                variant="soft"
+                sx={{ height: 22, fontSize: '0.725rem', fontWeight: 600 }}
+              />
+            );
+          })
+        ) : (
+          <Typography variant="body2">{tx.receiver || '—'}</Typography>
+        )}
+      </Stack>
+    ),
     sentAt: <Typography variant="caption">{tx.sentAt || tx.updatedAt}</Typography>,
-    status: <StatusChip status={tx.status} />,
-    ack: <StatusChip status={tx.ack} />,
-    retries: tx.retries,
     actions: (
       <TransactionActionsMenu
         tx={tx}
-        onDetail={() => { setDetailTx(tx); setDetailTab(0); }}
-        onEdit={() => handleEdit(tx)}
-        onReplay={() => handleReplay(tx.id)}
-        onDelete={() => handleDelete(tx.id)}
+        onDetail={() => { setDetailTx(tx); }}
+        onReplay={() => handleReplay(tx.id || tx.code || '')}
+        onDelete={() => handleDelete(tx.id || tx.code || '')}
+        onAck={() => handleAck(tx)}
       />
     ),
   }));
-
-  function handleOpenCreate() {
-    setEditingId(null);
-    setFormValues({
-      ...emptyForm,
-      id: `TX-${String(Date.now()).slice(-10)}`,
-      sentAt: new Date().toLocaleDateString('vi-VN').replace(/\//g, '/') + ' ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      updatedAt: new Date().toLocaleDateString('vi-VN'),
-    });
-    setOpenForm(true);
-  }
-
-  function handleEdit(tx: ExchangeTransaction) {
-    setEditingId(tx.id);
-    setFormValues(tx);
-    setOpenForm(true);
-  }
-
-  function handleDelete(id: string) {
-    setList((prev) => prev.filter((tx) => tx.id !== id));
-  }
-
-  function handleReplay(id: string) {
-    setList((prev) =>
-      prev.map((tx) =>
-        tx.id === id ? { ...tx, status: 'retrying', ack: 'WAITING', retries: tx.retries + 1, updatedAt: '20/07/2026 10:00' } : tx
-      )
-    );
-  }
-
-  function handleSubmit() {
-    if (!formValues.id || !formValues.documentCode || !formValues.sender || !formValues.receiver) return;
-    const next = {
-      ...formValues,
-      route: formValues.route || `${formValues.sender} -> TRUC_LT -> ${formValues.receiver}`,
-      updatedAt: formValues.sentAt || formValues.updatedAt,
-    };
-    if (editingId) {
-      setList((prev) => prev.map((tx) => (tx.id === editingId ? next : tx)));
-    } else {
-      setList((prev) => [next, ...prev]);
-    }
-    setOpenForm(false);
-  }
 
   const stats = {
     total: list.length,
@@ -333,10 +531,10 @@ export default function DocumentExchangePage() {
 
       {/* ── Metrics ── */}
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
-        <MetricCard label="Tổng giao dịch" value={stats.total} helper="Trong tất cả thời gian" icon="solar:inbox-in-bold" />
-        <MetricCard label="Tỷ lệ thành công" value={`${Math.round((stats.received / Math.max(stats.total, 1)) * 100)}%`} helper={`${stats.received} giao dịch RECEIVED`} icon="solar:check-read-bold" />
-        <MetricCard label="Đang chờ ACK" value={stats.waiting} helper="WAITING — chưa nhận xác nhận" icon="solar:chat-round-line-bold" />
-        <MetricCard label="Lỗi / Retry" value={`${stats.failed} / ${stats.retrying}`} helper="Failed cần xử lý thủ công" icon="solar:restart-bold" />
+        <MetricCard label="Tổng giao dịch" value={stats.total} helper="Trong tất cả thời gian" icon="solar:inbox-in-bold" backgroundColor="#01AD65" />
+        <MetricCard label="Tỷ lệ thành công" value={`${Math.round((stats.received / Math.max(stats.total, 1)) * 100)}%`} helper={`${stats.received} giao dịch RECEIVED`} icon="solar:check-read-bold" backgroundColor="#028EDD" />
+        <MetricCard label="Đang chờ ACK" value={stats.waiting} helper="WAITING — chưa nhận xác nhận" icon="solar:chat-round-line-bold" backgroundColor="#9E50FE" />
+        <MetricCard label="Lỗi / Retry" value={`${stats.failed} / ${stats.retrying}`} helper="Failed cần xử lý thủ công" icon="solar:restart-bold" backgroundColor="#FF8551" />
       </GridRow>
 
       {/* ── Bảng Delivery Tracking ── */}
@@ -344,7 +542,7 @@ export default function DocumentExchangePage() {
         title="Theo dõi giao dịch"
         subtitle="Lịch sử giao dịch liên thông. Bấm Transaction ID hoặc Chi tiết để xem đầy đủ thông tin, lý do lỗi, thời gian gửi/nhận."
         action={
-          <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={handleOpenCreate}>
+          <Button variant="contained" startIcon={<Iconify icon="solar:add-circle-bold" />} onClick={() => setOpenForm(true)}>
             Thêm giao dịch
           </Button>
         }
@@ -357,34 +555,17 @@ export default function DocumentExchangePage() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="Transaction ID, văn bản, nơi gửi, nơi nhận..."
-              sx={{ flex: 1 }}
+              fullWidth
             />
-            <TextField
-              size="small"
-              label="Lọc trạng thái"
-              select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              sx={{ minWidth: 160 }}
-            >
-              <MenuItem value="">Tất cả</MenuItem>
-              <MenuItem value="received">Received</MenuItem>
-              <MenuItem value="sent">Sent</MenuItem>
-              <MenuItem value="retrying">Retrying</MenuItem>
-              <MenuItem value="failed">Failed</MenuItem>
-            </TextField>
           </Stack>
 
           <DataTable
             columns={[
-              { key: 'id', label: 'Transaction ID' },
+              { key: 'stt', label: 'STT', align: 'center', width: 60 },
               { key: 'documentCode', label: 'Văn bản' },
               { key: 'sender', label: 'Nơi gửi' },
               { key: 'receiver', label: 'Nơi nhận' },
               { key: 'sentAt', label: 'Thời gian gửi' },
-              { key: 'status', label: 'Trạng thái', align: 'center' },
-              { key: 'ack', label: 'ACK', align: 'center' },
-              { key: 'retries', label: 'Retry', align: 'right' },
               { key: 'actions', label: 'Thao tác', align: 'right' },
             ]}
             rows={tableRows}
@@ -392,311 +573,59 @@ export default function DocumentExchangePage() {
         </Stack>
       </SectionCard>
 
-      {/* ── Dialog Chi tiết giao dịch ── */}
-      <Dialog open={Boolean(detailTx)} onClose={() => setDetailTx(null)} fullWidth maxWidth="md">
-        {detailTx && (
-          <>
-            <DialogTitle>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-                <Box>
-                  <Typography variant="h6">{detailTx.id}</Typography>
-                  <Typography variant="body2" color="text.secondary">{detailTx.documentCode} — {detailTx.documentTitle}</Typography>
-                </Box>
-                <Stack direction="row" spacing={1}>
-                  <StatusChip status={detailTx.status} />
-                  <StatusChip status={detailTx.ack} />
-                </Stack>
-              </Stack>
-            </DialogTitle>
-            <Divider />
-            <DialogContent sx={{ pt: 1 }}>
-              <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ mb: 2 }}>
-                <Tab label="Metadata" icon={<Iconify icon="solar:document-text-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                <Tab label="File đính kèm" icon={<Iconify icon="solar:paperclip-2-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                <Tab label="Lịch sử trạng thái" icon={<Iconify icon="solar:history-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40 }} />
-                {(detailTx.errorReason) && (
-                  <Tab label="Lỗi" icon={<Iconify icon="solar:bug-bold" width={16} />} iconPosition="start" sx={{ minHeight: 40, color: 'error.main' }} />
-                )}
-              </Tabs>
+      <DocumentExchangeDetailDialog
+        open={Boolean(detailTx)}
+        detailTx={detailTx}
+        onClose={() => setDetailTx(null)}
+        onAck={handleAck}
+        onReplay={handleReplay}
+      />
 
-              {detailTab === 0 && (
-                <Grid container spacing={2}>
-                  {[
-                    { label: 'Transaction ID', value: detailTx.id },
-                    { label: 'Loại văn bản', value: detailTx.documentType || '—' },
-                    { label: 'Số ký hiệu văn bản', value: detailTx.documentCode },
-                    { label: 'Route', value: detailTx.route },
-                    { label: 'Nơi gửi', value: detailTx.sender },
-                    { label: 'Người gửi', value: detailTx.senderPerson ? `${detailTx.senderPerson} — ${detailTx.senderTitle}` : '—' },
-                    { label: 'Nơi nhận', value: detailTx.receiver },
-                    { label: 'Thời gian gửi', value: detailTx.sentAt || '—' },
-                    { label: 'Thời gian nhận', value: detailTx.receivedAt || '—' },
-                    { label: 'Cập nhật lần cuối', value: detailTx.updatedAt },
-                    { label: 'Số lần retry', value: String(detailTx.retries) },
-                    { label: 'ACK', value: detailTx.ack },
-                  ].map((row) => (
-                    <Grid key={row.label} item xs={12} sm={6}>
-                      <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                        <Typography variant="caption" color="text.secondary">{row.label}</Typography>
-                        <Typography variant="subtitle2">{row.value}</Typography>
-                      </Box>
-                    </Grid>
-                  ))}
-                  <Grid item xs={12}>
-                    <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'background.neutral' }}>
-                      <Typography variant="caption" color="text.secondary">Trích yếu</Typography>
-                      <Typography variant="body2">{detailTx.documentTitle || '—'}</Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              )}
+      <DocumentExchangeCreateDialog
+        open={openForm}
+        onClose={() => setOpenForm(false)}
+        onSubmit={handleCreateSubmit}
+        documentOptions={documentOptions}
+        unitOptions={unitOptions}
+      />
 
-              {detailTab === 1 && (
-                <DataTable
-                  minWidth={780}
-                  columns={[
-                    { key: 'fileName', label: 'Tên file', width: 220 },
-                    { key: 'type', label: 'Loại', width: 180 },
-                    { key: 'size', label: 'Kích thước', align: 'right', width: 110 },
-                    { key: 'uploadedAt', label: 'Upload lúc', width: 150 },
-                    { key: 'actions', label: 'Thao tác', align: 'center', width: 90 },
-                  ]}
-                  rows={[
-                    {
-                      fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.pdf`,
-                      type: 'application/pdf',
-                      size: '2.1 MB',
-                      uploadedAt: detailTx.sentAt || detailTx.updatedAt,
-                      actions: (
-                        <AttachmentActionsMenu
-                          file={{
-                            fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.pdf`,
-                            type: 'application/pdf',
-                            size: '2.1 MB',
-                          }}
-                          onPreview={setPreviewFile}
-                        />
-                      ),
-                    },
-                    {
-                      fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.xml`,
-                      type: 'application/xml',
-                      size: '38 KB',
-                      uploadedAt: detailTx.sentAt || detailTx.updatedAt,
-                      actions: (
-                        <AttachmentActionsMenu
-                          file={{
-                            fileName: `${detailTx.documentCode.replace(/\//g, '_').toLowerCase()}.xml`,
-                            type: 'application/xml',
-                            size: '38 KB',
-                          }}
-                          onPreview={setPreviewFile}
-                        />
-                      ),
-                    },
-                  ]}
-                />
-              )}
-
-              {detailTab === 2 && (
-                <DataTable
-                  columns={[
-                    { key: 'time', label: 'Thời gian' },
-                    { key: 'event', label: 'Sự kiện' },
-                    { key: 'actor', label: 'Thực hiện bởi' },
-                    { key: 'detail', label: 'Chi tiết' },
-                  ]}
-                  rows={[
-                    { time: detailTx.sentAt || detailTx.updatedAt, event: 'Tiếp nhận gửi', actor: detailTx.senderPerson || detailTx.sender, detail: `Văn bản ${detailTx.documentCode} nộp vào hàng đợi giao nhận` },
-                    { time: detailTx.sentAt || detailTx.updatedAt, event: 'Định tuyến', actor: 'Hệ thống TRUC_LT', detail: `Route: ${detailTx.route}` },
-                    ...(detailTx.retries > 0 ? Array.from({ length: detailTx.retries }, (_, i) => ({
-                      time: detailTx.updatedAt,
-                      event: `Retry lần ${i + 1}`,
-                      actor: 'Hệ thống TRUC_LT',
-                      detail: detailTx.errorReason ? `Lỗi: ${detailTx.errorReason}. Thử lại tự động.` : `Retry #${i + 1}`,
-                    })) : []),
-                    ...(detailTx.status === 'received' ? [{ time: detailTx.receivedAt || detailTx.updatedAt, event: 'Giao thành công', actor: detailTx.receiver, detail: 'Đơn vị nhận xác nhận ACK, hoàn tất giao dịch' }] : []),
-                    ...(detailTx.status === 'failed' ? [{ time: detailTx.updatedAt, event: 'Thất bại', actor: 'Hệ thống TRUC_LT', detail: detailTx.errorDetail || 'Giao dịch thất bại sau số lần retry tối đa' }] : []),
-                  ]}
-                />
-              )}
-
-              {detailTab === 3 && detailTx.errorReason && (
-                <Stack spacing={2}>
-                  <Alert severity="error" icon={<Iconify icon="solar:bug-bold" />}>
-                    <Typography variant="subtitle2">{detailTx.errorReason}</Typography>
-                  </Alert>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'error.lighter' }}>
-                    <Typography variant="body2" color="error.darker">{detailTx.errorDetail}</Typography>
-                  </Box>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Hướng dẫn xử lý</Typography>
-                    {detailTx.errorReason === 'API Timeout' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Kiểm tra trạng thái endpoint đơn vị nhận.</Typography>
-                        <Typography variant="body2">2. Nếu endpoint đã ổn định, bấm <strong>Replay</strong> để thử lại.</Typography>
-                        <Typography variant="body2">3. Nếu vẫn lỗi, liên hệ quản trị viên kiểm tra network.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Signature Error' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Yêu cầu đơn vị gửi ký lại văn bản với chứng thư số còn hiệu lực.</Typography>
-                        <Typography variant="body2">2. Đảm bảo file PDF và XML được ký cùng một lần, không chỉnh sửa sau ký.</Typography>
-                        <Typography variant="body2">3. Gửi lại giao dịch sau khi đã ký đúng.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Routing Error' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Vào <strong>Kết nối liên thông</strong> → tab <strong>Endpoint</strong> để kiểm tra cấu hình route.</Typography>
-                        <Typography variant="body2">2. Cập nhật đúng agencyCode và endpoint URL cho đơn vị nhận.</Typography>
-                        <Typography variant="body2">3. Bấm <strong>Replay</strong> sau khi route đã được sửa.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Auth Failed' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Vào <strong>Kết nối liên thông</strong> → tab <strong>API Key</strong> hoặc <strong>Credential</strong>.</Typography>
-                        <Typography variant="body2">2. Cấp lại API Key hoặc renew certificate cho đơn vị liên quan.</Typography>
-                        <Typography variant="body2">3. Bấm <strong>Replay</strong> sau khi thông tin xác thực đã cập nhật.</Typography>
-                      </Stack>
-                    )}
-                    {detailTx.errorReason === 'Storage Error' && (
-                      <Stack spacing={0.5}>
-                        <Typography variant="body2">1. Hệ thống đang tự chuyển sang node lưu trữ dự phòng.</Typography>
-                        <Typography variant="body2">2. Chờ hệ thống retry tự động. Nếu không tự phục hồi, liên hệ quản trị viên hạ tầng.</Typography>
-                      </Stack>
-                    )}
-                  </Box>
-                </Stack>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setDetailTx(null)}>Đóng</Button>
-              {(detailTx.status === 'failed' || detailTx.status === 'retrying') && (
-                <Button variant="contained" color="warning" onClick={() => { handleReplay(detailTx.id); setDetailTx(null); }}>
-                  Replay giao dịch
-                </Button>
-              )}
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
-
-      <Dialog open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Xem file đính kèm</DialogTitle>
-        <DialogContent>
-          {previewFile && (
-            <Stack spacing={2} sx={{ pt: 1 }}>
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Iconify
-                    icon={previewFile.type.includes('pdf') ? 'solar:file-text-bold' : 'solar:code-file-bold'}
-                    width={28}
-                    sx={{ color: 'primary.main' }}
-                  />
-                  <Box>
-                    <Typography variant="subtitle1">{previewFile.fileName}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {previewFile.type} · {previewFile.size}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
-              <Alert severity="info">
-                Đây là bản xem nhanh demo. Nội dung file thực tế sẽ được tải từ kho lưu trữ khi kết nối backend.
-              </Alert>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPreviewFile(null)}>Đóng</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── Dialog Thêm/Sửa ── */}
-      <Dialog open={openForm} onClose={() => setOpenForm(false)} fullWidth maxWidth="md">
-        <DialogTitle>{editingId ? 'Cập nhật giao dịch' : 'Tạo giao dịch mới'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Transaction ID" disabled={Boolean(editingId)}
-                value={formValues.id} onChange={(e) => setFormValues((p) => ({ ...p, id: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Số ký hiệu văn bản"
-                value={formValues.documentCode} onChange={(e) => setFormValues((p) => ({ ...p, documentCode: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField fullWidth label="Trích yếu"
-                value={formValues.documentTitle || ''} onChange={(e) => setFormValues((p) => ({ ...p, documentTitle: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Loại văn bản" select value={formValues.documentType || 'CONG_VAN'}
-                onChange={(e) => setFormValues((p) => ({ ...p, documentType: e.target.value }))}>
-                {DOC_TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Route"
-                value={formValues.route} onChange={(e) => setFormValues((p) => ({ ...p, route: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Nơi gửi"
-                value={formValues.sender} onChange={(e) => setFormValues((p) => ({ ...p, sender: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Người gửi"
-                value={formValues.senderPerson || ''} onChange={(e) => setFormValues((p) => ({ ...p, senderPerson: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Chức danh người gửi"
-                value={formValues.senderTitle || ''} onChange={(e) => setFormValues((p) => ({ ...p, senderTitle: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Nơi nhận"
-                value={formValues.receiver} onChange={(e) => setFormValues((p) => ({ ...p, receiver: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth label="Trạng thái" select value={formValues.status}
-                onChange={(e) => setFormValues((p) => ({ ...p, status: e.target.value as ExchangeTransaction['status'] }))}>
-                <MenuItem value="sent">sent</MenuItem>
-                <MenuItem value="received">received</MenuItem>
-                <MenuItem value="failed">failed</MenuItem>
-                <MenuItem value="retrying">retrying</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth label="ACK" select value={formValues.ack}
-                onChange={(e) => setFormValues((p) => ({ ...p, ack: e.target.value as ExchangeTransaction['ack'] }))}>
-                <MenuItem value="ACK">ACK</MenuItem>
-                <MenuItem value="NACK">NACK</MenuItem>
-                <MenuItem value="WAITING">WAITING</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField fullWidth type="number" label="Số lần retry"
-                value={formValues.retries} onChange={(e) => setFormValues((p) => ({ ...p, retries: Number(e.target.value) }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Thời gian gửi"
-                value={formValues.sentAt || ''} onChange={(e) => setFormValues((p) => ({ ...p, sentAt: e.target.value }))} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Lý do lỗi (nếu có)"
-                value={formValues.errorReason || ''} onChange={(e) => setFormValues((p) => ({ ...p, errorReason: e.target.value }))} />
-            </Grid>
-            {formValues.errorReason && (
-              <Grid item xs={12}>
-                <TextField fullWidth multiline rows={3} label="Chi tiết lỗi"
-                  value={formValues.errorDetail || ''} onChange={(e) => setFormValues((p) => ({ ...p, errorDetail: e.target.value }))} />
-              </Grid>
-            )}
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenForm(false)}>Hủy</Button>
-          <Button variant="contained" onClick={handleSubmit}>Lưu</Button>
-        </DialogActions>
-      </Dialog>
+      {/* ── Dialog Chọn Đơn vị xác nhận (ACK cho Demo) ── */}
+      {ackTarget && (
+        <Dialog open={Boolean(ackTarget)} onClose={() => setAckTarget(null)} fullWidth maxWidth="xs">
+          <DialogTitle>Chọn Đơn vị gửi Xác nhận (ACK)</DialogTitle>
+          <Divider />
+          <DialogContent sx={{ pt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Văn bản <strong>{ackTarget.tx.documentCode || ackTarget.tx.documentNo}</strong> được gửi cho {ackTarget.receivers.length} đơn vị. Chọn đơn vị bạn muốn đóng vai tiếp nhận phản hồi:
+            </Typography>
+            <TextField
+              select
+              fullWidth
+              label="Đơn vị nhận xác nhận"
+              value={ackTarget.selectedCode}
+              onChange={(e) => setAckTarget({ ...ackTarget, selectedCode: e.target.value })}
+              SelectProps={{ native: true }}
+            >
+              {ackTarget.receivers.map((r) => (
+                <option key={r.code} value={r.code}>
+                  {r.name} ({r.status === 'ACK' ? 'Đã ACK' : 'Chờ ACK'})
+                </option>
+              ))}
+            </TextField>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAckTarget(null)}>Hủy</Button>
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<Iconify icon="solar:check-circle-bold" />}
+              onClick={() => executeAck(ackTarget.tx, ackTarget.selectedCode)}
+            >
+              Gửi xác nhận (ACK)
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </PageShell>
   );
 }

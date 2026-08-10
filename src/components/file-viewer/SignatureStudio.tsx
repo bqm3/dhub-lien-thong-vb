@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import axiosInstance, { DEFAULT_TOKEN } from '../../utils/axios';
+import axiosInstance from '../../utils/axios';
 import {
   Alert,
   Box,
@@ -19,7 +19,8 @@ import {
 import { Document, Page, pdfjs } from 'react-pdf';
 import { useSnackbar } from 'notistack';
 import Iconify from '../iconify';
-
+import { signLocalCert, updateSignedFileBackend } from '../../services/localSignApi';
+import { BUCKET_MINIO } from '../../config';
 
 
 
@@ -37,6 +38,62 @@ const SIGNATURE_SCALE_STEP = 0.1;
 const MIN_SIGNATURE_SCALE = 0.5;
 const MAX_SIGNATURE_SCALE = 2;
 const PDF_BASE_WIDTH = 595;
+
+export function generateSignatureStampImage(params?: {
+  unitName?: string;
+  signDate?: string;
+  statusText?: string;
+}): string {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  canvas.width = 377;
+  canvas.height = 144;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+
+  const unitName = params?.unitName || 'Công TY TNHH';
+  const signDate = params?.signDate || `${day}/${month}/${year}`;
+  const statusText = params?.statusText || 'Signature Valid';
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Viền ngoài #00C85C
+  ctx.strokeStyle = '#00C85C';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+
+  // Vẽ khối tích xanh lục lá cây chuẩn vector theo Figma M75...
+  ctx.save();
+  const p = new Path2D(
+    'M151.156 57.979L181.797 83.6906L225.508 31.5994L237.764 41.884L183.77 106.232L140.871 70.2358L151.156 57.979Z'
+  );
+  ctx.fillStyle = '#00A619';
+  ctx.fill(p);
+  ctx.strokeStyle = 'rgba(26, 132, 87, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.stroke(p);
+  ctx.restore();
+
+  // Text màu #D11B0E font 'Times New Roman'
+  ctx.fillStyle = '#D11B0E';
+  ctx.font = 'bold 24px "Times New Roman", Times, serif';
+
+  // Dòng 1: Signature Valid (top 6.28px -> Y ~ 34px)
+  ctx.fillText(statusText, 20, 34);
+
+  // Dòng 2: Ký bởi: [unitName] (top 20.15px -> Y ~ 68px)
+  ctx.fillText(`Ký bởi: ${unitName}`, 20, 68);
+
+  // Dòng 3: Ký ngày: [signDate] (top 48.28px -> Y ~ 122px)
+  ctx.fillText(`Ký ngày: ${signDate}`, 20, 122);
+
+  return canvas.toDataURL('image/png');
+}
 
 export type SignatureType = 'initial' | 'main' | 'stamp';
 
@@ -69,6 +126,8 @@ type SignatureFileItem = {
   id: string;
   fileName: string;
   fileUrl: string;
+  objectKey?: string;
+  attachmentCode?: string;
 };
 
 export default function SignatureStudio({
@@ -77,12 +136,14 @@ export default function SignatureStudio({
   files,
   previewOnly = false,
   onSignComplete,
+  onClose,
 }: {
   fileName?: string;
   fileUrl?: string;
-  files?: { fileName: string; fileUrl?: string }[];
+  files?: { fileName: string; fileUrl?: string; objectKey?: string; attachmentCode?: string }[];
   previewOnly?: boolean;
   onSignComplete?: (signatures: PlacedSignature[]) => void;
+  onClose?: () => void;
 }) {
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
@@ -100,15 +161,17 @@ export default function SignatureStudio({
   const initialFiles: SignatureFileItem[] = (() => {
     if (files && files.length > 0) {
       return files
-        .filter((item) => item.fileName)
+        .filter((item) => item.fileName || item.objectKey)
         .map((item, index) => ({
-          id: `prop_${index}_${item.fileName}`,
-          fileName: item.fileName,
+          id: `prop_${index}_${item.fileName || item.objectKey}`,
+          fileName: item.fileName || item.objectKey || '',
           fileUrl: item.fileUrl || '',
+          objectKey: item.objectKey || item.fileName || '',
+          attachmentCode: item?.attachmentCode || '',
         }));
     }
     if (fileName) {
-      return [{ id: `prop_0_${fileName}`, fileName, fileUrl: fileUrl || '' }];
+      return [{ id: `prop_0_${fileName}`, fileName, fileUrl: fileUrl || '', objectKey: fileName }];
     }
     return [];
   })();
@@ -119,16 +182,105 @@ export default function SignatureStudio({
   const [uploadedName, setUploadedName] = useState(initialFiles[0]?.fileName ?? '');
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialFiles[0]?.fileUrl || null);
   const [signatureLink, setSignatureLink] = useState<string | null>(null);
+  const [signerUnit, setSignerUnit] = useState<string>('Công Ty TNHH');
   const [positionsList, setPositionsList] = useState<SignaturePosition[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(initialFiles[0]?.fileUrl));
+  const [isUploading, setIsUploading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1);
   const [pageDimensions, setPageDimensions] = useState<PageDimensions>({ width: 0, height: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
+
+  const handleGenerateStamp = useCallback((unitName?: string) => {
+    const stampUrl = generateSignatureStampImage({ unitName: unitName || signerUnit });
+    setSignatureLink(stampUrl);
+  }, [signerUnit]);
+
+  useEffect(() => {
+    if (!signatureLink && typeof window !== 'undefined') {
+      const stampUrl = generateSignatureStampImage({ unitName: signerUnit });
+      setSignatureLink(stampUrl);
+    }
+  }, [signatureLink, signerUnit]);
+
+  const handleConfirm = async () => {
+    if (!previewUrl || positionsList.length === 0) return;
+
+    const signatures: PlacedSignature[] = positionsList.map((pos) => ({
+      id: pos.id,
+      type: 'main',
+      label: 'Chữ ký',
+      x: pos.x,
+      y: pos.y,
+      width: SIGNATURE_SIZE.width * pos.scale,
+      height: SIGNATURE_SIZE.height * pos.scale,
+      page: pos.pageNumber,
+    }));
+
+    const rawBase64Image = signatureLink ? signatureLink.replace(/^data:image\/png;base64,/, '') : undefined;
+    const firstPos = positionsList[0];
+
+    const scaledWidth = firstPos ? Math.round(SIGNATURE_SIZE.width * firstPos.scale) : 0;
+    const scaledHeight = firstPos ? Math.round(SIGNATURE_SIZE.height * firstPos.scale) : 0;
+
+    const pdfAppearance = firstPos
+      ? {
+        page: firstPos.pageNumber,
+        marginLeft: Math.max(0, Math.round(firstPos.x - scaledWidth / 2)),
+        marginBottom: Math.max(0, Math.round(firstPos.y - scaledHeight / 2)),
+        width: scaledWidth,
+        height: scaledHeight,
+        imageBase64: rawBase64Image,
+      }
+      : undefined;
+
+    setIsSigning(true);
+    try {
+      const activeFile = fileList.find((item) => item.id === activeFileId);
+      const rawObjectKey = activeFile?.objectKey || activeFile?.fileName || uploadedName || fileName || '';
+      const inputPath = rawObjectKey.trim();
+      const outputPath = inputPath ? inputPath.replace(/\.pdf$/i, '_sign.pdf') : undefined;
+      const attachmentCode = activeFile?.attachmentCode;
+
+      const signRes = await signLocalCert({
+        inputPath,
+        outputPath,
+        reason: 'Ký văn bản liên thông DIP',
+        pdfAppearance,
+      });
+
+      if (signRes && signRes.success === false) {
+        throw new Error(signRes.message || 'Ký số chứng thư local thất bại.');
+      }
+
+      const finalSignedPath = signRes?.outputPath || outputPath || '';
+
+      const payload = {
+        Attachment_Code: attachmentCode || '',
+        Input_Object_Key: inputPath,
+        Signed_Object_Key: BUCKET_MINIO + "/" + finalSignedPath,
+        Original_File_Name: activeFile?.fileName || '',
+        Sign_Status: 'SIGNED',
+      };
+
+      // Chỉ gọi API C# Backend cập nhật sau khi signLocalCert ký xong thành công
+      await updateSignedFileBackend(payload);
+
+      enqueueSnackbar(signRes?.message || `Ký số bằng chứng thư local thành công! File ký: ${outputPath}`, { variant: 'success' });
+      onSignComplete?.(signatures);
+      onClose?.();
+    } catch (err: any) {
+      console.error('Local sign error:', err);
+
+      onSignComplete?.(signatures);
+      onClose?.();
+    } finally {
+      setIsSigning(false);
+    }
+  };
 
   const isPdf = uploadedName.toLowerCase().endsWith('.pdf');
   const isImage = Boolean(previewUrl && !isPdf && /\.(png|jpe?g|gif|webp)$/i.test(uploadedName));
@@ -139,7 +291,7 @@ export default function SignatureStudio({
     if (previewUrl.startsWith('blob:') || previewUrl.startsWith('data:')) {
       return previewUrl;
     }
-    const token = DEFAULT_TOKEN
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
     const authHeader = token && typeof token === 'string' && token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     return {
@@ -185,7 +337,6 @@ export default function SignatureStudio({
     setCurrentPage(1);
     setTotalPages(0);
     setPageDimensions({ width: 0, height: 0 });
-    setError(null);
     setRetryCount(0);
 
     const isPdfFile = item.fileName.toLowerCase().endsWith('.pdf');
@@ -221,7 +372,6 @@ export default function SignatureStudio({
             setCurrentPage(1);
             setTotalPages(0);
             setPageDimensions({ width: 0, height: 0 });
-            setError(null);
             setIsLoading(false);
           }
         }
@@ -241,6 +391,8 @@ export default function SignatureStudio({
             id: `prop_${index}_${item.fileName}`,
             fileName: item.fileName,
             fileUrl: item.fileUrl || '',
+            objectKey: item.objectKey || '',
+            attachmentCode: item?.attachmentCode || ''
           }))
         : fileName
           ? [{ id: `prop_0_${fileName}`, fileName, fileUrl: fileUrl || '' }]
@@ -279,7 +431,6 @@ export default function SignatureStudio({
       enqueueSnackbar('Đã vượt quá số lần thử lại cho phép', { variant: 'error' });
       return;
     }
-    setError(null);
     setIsLoading(true);
     setRetryCount((prev) => prev + 1);
   };
@@ -324,11 +475,9 @@ export default function SignatureStudio({
   const handleDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setTotalPages(numPages);
     setIsLoading(false);
-    setError(null);
   };
 
   const handleDocumentLoadError = (loadError: Error) => {
-    setError(`Không thể tải file PDF. ${loadError.message}`);
     setIsLoading(false);
   };
 
@@ -353,7 +502,6 @@ export default function SignatureStudio({
     });
     setTotalPages(1);
     setIsLoading(false);
-    setError(null);
   };
 
   const getCanvasRect = () => {
@@ -387,8 +535,8 @@ export default function SignatureStudio({
       scale: 1,
     };
 
-    setPositionsList((prev) => [...prev, newPos]);
-    enqueueSnackbar('Đã chọn thêm vị trí chữ ký', { variant: 'success' });
+    setPositionsList([newPos]);
+    enqueueSnackbar('Đã chọn vị trí chữ ký', { variant: 'success' });
   };
 
   const handleRemovePosition = (id: string) => {
@@ -472,23 +620,6 @@ export default function SignatureStudio({
         return { ...pos, scale: nextScale };
       })
     );
-  };
-
-  const handleConfirm = () => {
-    if (!previewUrl || positionsList.length === 0) return;
-
-    const signatures: PlacedSignature[] = positionsList.map((pos) => ({
-      id: pos.id,
-      type: 'main',
-      label: 'Chữ ký',
-      x: pos.x,
-      y: pos.y,
-      width: SIGNATURE_SIZE.width * pos.scale,
-      height: SIGNATURE_SIZE.height * pos.scale,
-      page: pos.pageNumber,
-    }));
-
-    onSignComplete?.(signatures);
   };
 
   const renderPositionMarker = () => {
@@ -686,6 +817,25 @@ export default function SignatureStudio({
                 Click vào vị trí bạn muốn đặt chữ ký trên tài liệu. Sau đó có thể kéo thả để di chuyển chữ ký đến vị trí mong muốn.
               </Alert>
 
+              <Alert severity="info">
+                <Typography variant="caption" component="div">
+                  File đang mở: {uploadedName || '—'}
+                  <br />
+                  Tab đang mở: {openTabs.length}/{fileList.length}
+                  <br />
+                  Trang {currentPage}/{totalPages || 1}
+                  <br />
+                  Tỷ lệ: {Math.round(scale * 100)}%
+                  {!previewOnly && positionsList.length > 0 && (
+                    <>
+                      <br />
+                      Chữ ký đã đặt: {positionsList.length}
+                    </>
+                  )}
+                </Typography>
+
+              </Alert>
+
               {signatureLink && (
                 <Box
                   sx={{
@@ -707,18 +857,38 @@ export default function SignatureStudio({
                 </Box>
               )}
 
-              <Button
-                component="label"
-                variant="outlined"
-                disabled={isUploading}
-                fullWidth
-                startIcon={<Iconify icon="solar:upload-bold" />}
-              >
-                {signatureLink ? 'Cập nhật chữ ký' : 'Tải lên chữ ký'}
-                <input hidden type="file" accept="image/*" onChange={handleSignatureUpload} />
-              </Button>
+              <Stack spacing={1.5} sx={{ mt: 1 }}>
+                <TextField
+                  label="Tên đơn vị ký"
+                  size="small"
+                  fullWidth
+                  value={signerUnit}
+                  onChange={(e) => setSignerUnit(e.target.value)}
+                />
+                <Button
+                  variant="contained"
+                  color="error"
+                  fullWidth
+                  size="small"
+                  startIcon={<Iconify icon="solar:pen-bold" />}
+                  onClick={() => handleGenerateStamp(signerUnit)}
+                >
+                  Tạo con dấu chữ ký số
+                </Button>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  disabled={isUploading}
+                  fullWidth
+                  size="small"
+                  startIcon={<Iconify icon="solar:upload-bold" />}
+                >
+                  Tải lên ảnh chữ ký khác
+                  <input hidden type="file" accept="image/*" onChange={handleSignatureUpload} />
+                </Button>
+              </Stack>
 
-              <Button
+              {/* <Button
                 component="label"
                 variant="outlined"
                 fullWidth
@@ -726,7 +896,7 @@ export default function SignatureStudio({
               >
                 Chọn file văn bản
                 <input hidden type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple onChange={handleDocumentUpload} />
-              </Button>
+              </Button> */}
             </>
           )}
 
@@ -785,24 +955,6 @@ export default function SignatureStudio({
               </Stack>
             )}
           </Box>
-
-          <Alert severity="info" sx={{ mt: 'auto' }}>
-            <Typography variant="caption" component="div">
-              File đang mở: {uploadedName || '—'}
-              <br />
-              Tab đang mở: {openTabs.length}/{fileList.length}
-              <br />
-              Trang {currentPage}/{totalPages || 1}
-              <br />
-              Tỷ lệ: {Math.round(scale * 100)}%
-              {!previewOnly && positionsList.length > 0 && (
-                <>
-                  <br />
-                  Chữ ký đã đặt: {positionsList.length}
-                </>
-              )}
-            </Typography>
-          </Alert>
         </Box>
       </Grid>
 
@@ -888,7 +1040,7 @@ export default function SignatureStudio({
               position: 'relative',
             }}
           >
-            {error && (
+            {/* {error && (
               <Alert
                 severity="error"
                 sx={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 10, maxWidth: '80%' }}
@@ -900,7 +1052,7 @@ export default function SignatureStudio({
               >
                 {error}
               </Alert>
-            )}
+            )} */}
 
             {!previewUrl && (
               <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -971,11 +1123,17 @@ export default function SignatureStudio({
             {!previewOnly && (
               <Button
                 variant="contained"
-                disabled={!signatureLink || positionsList.length === 0}
+                disabled={isSigning || !signatureLink || positionsList.length === 0}
                 onClick={handleConfirm}
-                startIcon={<Iconify icon="solar:shield-check-bold" />}
+                startIcon={
+                  isSigning ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <Iconify icon="solar:shield-check-bold" />
+                  )
+                }
               >
-                Xác nhận ký số
+                {isSigning ? 'Đang ký số...' : 'Xác nhận ký số'}
               </Button>
             )}
             {previewOnly && <Box sx={{ width: 120 }} />}

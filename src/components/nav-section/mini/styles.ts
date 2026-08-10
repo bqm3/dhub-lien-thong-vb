@@ -41,8 +41,11 @@ export const StyledItem = styled(ListItemButton, {
     flexDirection: 'column',
     textTransform: 'capitalize',
     padding: theme.spacing(1, 0, 0.5, 0),
-    color: theme.palette.text.secondary,
+    color: '#FFFFFF',
     borderRadius: theme.shape.borderRadius,
+    '& .MuiListItemIcon-root': {
+      color: '#FFFFFF',
+    },
     '&:hover': hoverStyle,
     // Sub item
     ...(subItem && {
@@ -82,6 +85,7 @@ export const StyledIcon = styled(ListItemIcon)({
   marginBottom: 4,
   width: ICON.NAV_ITEM_MINI,
   height: ICON.NAV_ITEM_MINI,
+  color: '#FFFFFF !important',
 });
 
 // ----------------------------------------------------------------------

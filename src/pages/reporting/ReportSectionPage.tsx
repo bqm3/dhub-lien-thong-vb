@@ -70,7 +70,7 @@ export default function ReportSectionPage({ section }: ReportSectionPageProps) {
       {/* <SectionCard title="Danh mục báo cáo" subtitle="Chuyển nhanh giữa các báo cáo nghiệp vụ."><Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>{reportOrder.map((item, index) => <Button key={item.key} component={RouterLink} to={paths[item.key]} variant={item.key === section ? 'contained' : 'outlined'} size="small">{index + 1}. {item.label}</Button>)}</Stack></SectionCard> */}
 
       <GridRow cols={{ xs: 1, sm: 2, lg: 4 }}>
-        {config.metrics.map((metric) => <MetricCard key={metric.label} label={metric.label} value={metric.value} helper={metric.helper} icon={metric.icon} />)}
+        {config.metrics.map((metric) => <MetricCard key={metric.label} label={metric.label} value={metric.value} helper={metric.helper} icon={metric.icon} backgroundColor={metric.backgroundColor} textColor={metric.textColor} />)}
       </GridRow>
 
       <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>

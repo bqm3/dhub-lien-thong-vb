@@ -211,24 +211,28 @@ export default function RolesPage() {
           value={rows.length}
           helper={`Filter PARENT_CODE: ${parentCodeFilter}`}
           icon="solar:user-id-bold"
+          backgroundColor="#01AD65"
         />
         <MetricCard
           label="Đang active"
           value={rows.filter((r) => r.status === 'Active').length}
           helper="Gán cho người dùng"
           icon="solar:shield-check-bold"
+          backgroundColor="#028EDD"
         />
         <MetricCard
           label="Quyền (catalog)"
           value={permissionCatalog.length}
           helper="Danh sách permission mẫu"
           icon="solar:list-check-bold"
+          backgroundColor="#9E50FE"
         />
         <MetricCard
           label="Scope"
           value={new Set(rows.map((r) => r.scope)).size}
           helper="Hệ thống / Đơn vị"
           icon="solar:hierarchy-2-bold"
+          backgroundColor="#FF8551"
         />
       </GridRow>
 

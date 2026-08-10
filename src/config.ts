@@ -6,6 +6,8 @@ import { PATH_DASHBOARD } from './routes/paths';
 
 export const HOST_API_KEY = import.meta.env.REACT_APP_HOST_API_KEY || 'http://localhost:8800/api';
 
+export const BUCKET_MINIO = import.meta.env.VITE_BUCKET_MINIO 
+
 export const FIREBASE_API = {
   apiKey: import.meta.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: import.meta.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -35,10 +37,10 @@ export const PATH_AFTER_LOGIN = PATH_DASHBOARD.reporting.executive;
 // ----------------------------------------------------------------------
 
 export const HEADER = {
-  H_MOBILE: 64,
-  H_MAIN_DESKTOP: 88,
-  H_DASHBOARD_DESKTOP: 92,
-  H_DASHBOARD_DESKTOP_OFFSET: 92 - 32,
+  H_MOBILE: 56,
+  H_MAIN_DESKTOP: 60,
+  H_DASHBOARD_DESKTOP: 60,
+  H_DASHBOARD_DESKTOP_OFFSET: 56,
 };
 
 export const NAV = {

@@ -314,16 +314,16 @@ export default function InternalWorkflowPage() {
         </Grid>
 
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Luồng đang chạy" value={instances.filter((i) => i.overallStatus === 'Đang xử lý').length} helper="INTERNAL" icon="solar:route-bold" />
+          <MetricCard label="Luồng đang chạy" value={instances.filter((i) => i.overallStatus === 'Đang xử lý').length} helper="INTERNAL" icon="solar:route-bold" backgroundColor="#01AD65" />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Chờ ký số" value={instances.filter((i) => i.overallStatus === 'Chờ ký').length} helper="Bước ký file" icon="solar:pen-new-square-bold" />
+          <MetricCard label="Chờ ký số" value={instances.filter((i) => i.overallStatus === 'Chờ ký').length} helper="Bước ký file" icon="solar:pen-new-square-bold" backgroundColor="#028EDD" />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Đã gửi ra ngoài" value={instances.filter((i) => i.overallStatus === 'Đã gửi liên thông').length} helper="EXTERNAL" icon="solar:upload-bold" />
+          <MetricCard label="Đã gửi ra ngoài" value={instances.filter((i) => i.overallStatus === 'Đã gửi liên thông').length} helper="EXTERNAL" icon="solar:upload-bold" backgroundColor="#9E50FE" />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard label="Số bước / luồng" value={selected.steps.length} helper="Nhiều cấp duyệt" icon="solar:layers-bold" />
+          <MetricCard label="Số bước / luồng" value={selected.steps.length} helper="Nhiều cấp duyệt" icon="solar:layers-bold" backgroundColor="#FF8551" />
         </Grid>
       </Grid>
 

@@ -34,11 +34,11 @@ const GREY = {
 };
 
 const PRIMARY = {
-  lighter: '#C8FACD',
-  light: '#5BE584',
-  main: '#00AB55',
-  dark: '#007B55',
-  darker: '#005249',
+  lighter: '#D1F3FE',
+  light: '#5CC5EE',
+  main: 'rgba(5, 128, 180, 1)',
+  dark: '#035D84',
+  darker: '#013A53',
   contrastText: '#fff',
 };
 
@@ -117,7 +117,7 @@ export default function palette(themeMode: 'light' | 'dark') {
       secondary: GREY[600],
       disabled: GREY[500],
     },
-    background: { paper: '#fff', default: '#fff', neutral: GREY[200] },
+    background: { paper: '#fff', default: 'rgba(243, 246, 254, 1)', neutral: GREY[200] },
     action: {
       ...COMMON.action,
       active: GREY[600],

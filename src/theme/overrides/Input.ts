@@ -58,7 +58,7 @@ export default function Input(theme: Theme) {
           },
         },
         underline: {
-          '&:before, :after': {
+          '&:before, &:after': {
             display: 'none',
           },
         },

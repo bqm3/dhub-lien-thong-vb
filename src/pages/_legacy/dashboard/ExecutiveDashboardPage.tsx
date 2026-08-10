@@ -5,13 +5,13 @@ import {
   agencies,
   documents,
   exchangeTransactions,
-} from '../../sections/interoperability/mockData';
+} from '../../../sections/interoperability/mockData';
 import {
   MetricCard,
   PageShell,
   SectionCard,
-} from '../../sections/interoperability/components';
-import { useAuthContext } from '../../auth/useAuthContext';
+} from '../../../sections/interoperability/components';
+import { useAuthContext } from '../../../auth/useAuthContext';
 
 export default function ExecutiveDashboardPage() {
   const { user } = useAuthContext();
@@ -42,16 +42,16 @@ export default function ExecutiveDashboardPage() {
   const Bar = (Recharts as any).Bar as any;
 
   const isAdmin = user?.permissions?.includes('ADMIN_MANAGE');
-  const scopedAgencies = isAdmin ? agencies : agencies.filter((agency) => agency.code === user?.agencyCode);
+  const scopedAgencies = isAdmin ? agencies : agencies.filter((agency: any) => agency.code === user?.agencyCode);
 
-  const scopedAgencyNames = new Set(scopedAgencies.map((agency) => agency.name));
+  const scopedAgencyNames = new Set(scopedAgencies.map((agency: any) => agency.name));
   const scopedDocuments = isAdmin
     ? documents
-    : documents.filter((doc) => scopedAgencyNames.has(doc.sender) || scopedAgencyNames.has(doc.receiver));
+    : documents.filter((doc: any) => scopedAgencyNames.has(doc.sender) || scopedAgencyNames.has(doc.receiver));
   const scopedTransactions = isAdmin
     ? exchangeTransactions
     : exchangeTransactions.filter(
-        (tx) => scopedAgencyNames.has(tx.sender) || scopedAgencyNames.has(tx.receiver) || tx.route.includes(user?.agencyCode)
+        (tx: any) => scopedAgencyNames.has(tx.sender) || scopedAgencyNames.has(tx.receiver) || tx.route.includes(user?.agencyCode || '')
       );
 
   const overviewMetrics = [
@@ -73,19 +73,19 @@ export default function ExecutiveDashboardPage() {
   ];
 
   const statusDistribution = [
-    { name: 'Received', value: scopedTransactions.filter((t) => t.status === 'received').length },
-    { name: 'Sent', value: scopedTransactions.filter((t) => t.status === 'sent').length },
-    { name: 'Retrying', value: scopedTransactions.filter((t) => t.status === 'retrying').length },
-    { name: 'Failed', value: scopedTransactions.filter((t) => t.status === 'failed').length },
+    { name: 'Received', value: scopedTransactions.filter((t: any) => t.status === 'received').length },
+    { name: 'Sent', value: scopedTransactions.filter((t: any) => t.status === 'sent').length },
+    { name: 'Retrying', value: scopedTransactions.filter((t: any) => t.status === 'retrying').length },
+    { name: 'Failed', value: scopedTransactions.filter((t: any) => t.status === 'failed').length },
   ].filter((x) => x.value > 0);
 
   const ackDistribution = [
-    { name: 'ACK', value: scopedTransactions.filter((t) => t.ack === 'ACK').length },
-    { name: 'WAITING', value: scopedTransactions.filter((t) => t.ack === 'WAITING').length },
-    { name: 'NACK', value: scopedTransactions.filter((t) => t.ack === 'NACK').length },
+    { name: 'ACK', value: scopedTransactions.filter((t: any) => t.ack === 'ACK').length },
+    { name: 'WAITING', value: scopedTransactions.filter((t: any) => t.ack === 'WAITING').length },
+    { name: 'NACK', value: scopedTransactions.filter((t: any) => t.ack === 'NACK').length },
   ].filter((x) => x.value > 0);
 
-  const agencySuccess = scopedAgencies.map((a) => ({ name: a.name, successRate: a.successRate, latency: Number(a.avgLatency.replace('s', '')) }));
+  const agencySuccess = scopedAgencies.map((a: any) => ({ name: a.name, successRate: a.successRate, latency: Number(a.avgLatency.replace('s', '')) }));
 
   const trendData = [
     { day: 'T2', tx: Math.max(1, Math.round(scopedTransactions.length * 0.12)), docs: Math.max(1, Math.round(scopedDocuments.length * 0.08)) },
@@ -121,6 +121,7 @@ export default function ExecutiveDashboardPage() {
                 'solar:shield-check-bold',
                 'solar:danger-triangle-bold',
               ][index]}
+              backgroundColor={['#01AD65', '#028EDD', '#9E50FE', '#FF8551'][index % 4]}
             />
           </Grid>
         ))}

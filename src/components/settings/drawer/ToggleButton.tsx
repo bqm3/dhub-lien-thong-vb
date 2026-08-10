@@ -45,11 +45,11 @@ export default function ToggleButton({ notDefault, open, onToggle }: Props) {
         />
       )}
 
-      <Tooltip title="Settings">
+      {/* <Tooltip title="Settings">
         <IconButtonAnimate color="primary" onClick={onToggle} sx={{ p: 1.25 }}>
           <SvgColor src="/assets/icons/setting/ic_setting.svg" />
         </IconButtonAnimate>
-      </Tooltip>
+      </Tooltip> */}
     </Box>
   );
 }

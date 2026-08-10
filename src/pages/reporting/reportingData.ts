@@ -16,6 +16,8 @@ export type ReportMetric = {
   helper: string;
   icon: string;
   color: string;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 export type ChartPoint = Record<string, string | number>;
@@ -58,13 +60,17 @@ const commonIcons = [
   'solar:clock-circle-bold-duotone',
 ];
 
-const makeMetrics = (items: [string, string, string][]): ReportMetric[] =>
-  items.map(([label, value, helper], index) => ({
+const defaultBgColors = ['#01AD65', '#028EDD', '#9E50FE', '#FF8551'];
+
+const makeMetrics = (items: [string, string, string, string?, string?][]): ReportMetric[] =>
+  items.map(([label, value, helper, backgroundColor, textColor], index) => ({
     label,
     value,
     helper,
     icon: commonIcons[index],
     color: [colors.blue, colors.cyan, colors.green, colors.orange][index],
+    backgroundColor: backgroundColor?.trim() || defaultBgColors[index % defaultBgColors.length],
+    ...(textColor && { textColor }),
   }));
 
 const weekly = [
@@ -95,10 +101,10 @@ export const reportingData: Record<ReportSectionKey, ReportConfig> = {
     title: 'Báo cáo tổng quan hệ thống',
     subtitle: 'Bức tranh điều hành toàn hệ thống liên thông văn bản, cập nhật đến 21/07/2026.',
     metrics: makeMetrics([
-      ['Tổng văn bản', '184.620', 'Tăng 8,4% so với tháng trước'],
-      ['Tổng giao dịch', '356.842', '51.120 giao dịch trong 7 ngày'],
-      ['Tỷ lệ thành công', '99,18%', 'Cao hơn SLA mục tiêu 0,18%'],
-      ['Độ trễ trung bình', '2,7 giây', 'Giảm 0,4 giây so với tuần trước'],
+      ['Tổng văn bản', '184.620', 'Tăng 8,4% so với tháng trước', '#01AD65'],
+      ['Tổng giao dịch', '356.842', '51.120 giao dịch trong 7 ngày', '#028EDD'],
+      ['Tỷ lệ thành công', '99,18%', 'Cao hơn SLA mục tiêu 0,18%', '#9E50FE'],
+      ['Độ trễ trung bình', '2,7 giây', 'Giảm 0,4 giây so với tuần trước', ' #FF8551'],
     ]),
     trendTitle: 'Xu hướng giao dịch 7 ngày',
     trendSubtitle: 'So sánh lượng gửi, nhận thành công và giao dịch lỗi theo ngày.',

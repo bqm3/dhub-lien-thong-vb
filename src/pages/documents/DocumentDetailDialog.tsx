@@ -324,25 +324,47 @@ export default function DocumentDetailDialog({ doc, onClose, onDocumentUpdated }
             {detailTab === 1 && (
               <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
                 <Stack spacing={2}>
-                  <SignatureStudio
-                    files={((doc as any).attachments || []).map((item: any) => {
-                      const fileName = typeof item === 'string' ? item : item?.originalFileName || item?.name || '';
-                      const objectKey = typeof item === 'string' ? item : item?.objectKey || item?.OBJECT_KEY || fileName;
-                      return {
-                        fileName,
-                        fileUrl: getS3AttachmentUrl(objectKey || fileName) || '',
-                      };
-                    })}
-                    onSignComplete={async (signatures) => {
-                      const updatedDoc = {
-                        ...doc,
-                        signStatus: 'Đã ký số',
-                        signedPositions: signatures.length,
-                      };
-                      onDocumentUpdated(updatedDoc as any);
-                      enqueueSnackbar('Đã cập nhật trạng thái ký số cho văn bản', { variant: 'success' });
-                    }}
-                  />
+                  {(() => {
+                    const rawAttachments =
+                      (doc as any)?.attachments ||
+                      (doc as any)?.DOCUMENT_ATTACHMENT ||
+                      (doc as any)?.documentAttachment ||
+                      [];
+
+                    return (
+                      <SignatureStudio
+                        files={(rawAttachments || []).map((item: any) => {
+                          const fileName =
+                            typeof item === 'string'
+                              ? item
+                              : item?.originalFileName || item?.ORIGINAL_FILE_NAME || item?.name || item?.fileName || '';
+                          const objectKey =
+                            typeof item === 'string'
+                              ? item
+                              : item?.objectKey || item?.OBJECT_KEY || item?.filePath || item?.FILE_PATH || fileName;
+                          const attachmentCode = typeof item === 'string' ? '' : item?.code || item?.CODE || '';
+                          const attachmentId = typeof item === 'string' ? undefined : item?.id || item?.ID;
+                          return {
+                            fileName,
+                            objectKey,
+                            attachmentCode,
+                            attachmentId,
+                            fileUrl: getS3AttachmentUrl(objectKey || fileName) || '',
+                          };
+                        })}
+                        onSignComplete={async (signatures) => {
+                          const updatedDoc = {
+                            ...doc,
+                            signStatus: 'Đã ký số',
+                            signedPositions: signatures.length,
+                          };
+                          onDocumentUpdated(updatedDoc as any);
+                          enqueueSnackbar('Đã cập nhật trạng thái ký số cho văn bản', { variant: 'success' });
+                        }}
+                        onClose={onClose}
+                      />
+                    );
+                  })()}
                 </Stack>
               </Box>
             )}

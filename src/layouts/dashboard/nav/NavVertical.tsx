@@ -87,8 +87,8 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
           PaperProps={{
             sx: {
               width: NAV.W_DASHBOARD,
-              bgcolor: 'transparent',
-              borderRightStyle: 'dashed',
+              background: 'transparent',
+              borderRight: 'none',
             },
           }}
         >
@@ -104,6 +104,7 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
           PaperProps={{
             sx: {
               width: NAV.W_DASHBOARD,
+              background: 'linear-gradient(180deg, #004982 0%, #00355E 80.52%)',
             },
           }}
         >

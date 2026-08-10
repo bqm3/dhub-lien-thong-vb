@@ -9,6 +9,9 @@ export default function Drawer(theme: Theme) {
   return {
     MuiDrawer: {
       styleOverrides: {
+        paper: {
+          background: 'transparent',
+        },
         root: ({ ownerState }: { ownerState: DrawerProps }) => ({
           ...(ownerState.variant === 'temporary' && {
             '& .MuiDrawer-paper': {

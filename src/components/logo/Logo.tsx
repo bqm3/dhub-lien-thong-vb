@@ -18,8 +18,8 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
           display: 'inline-flex',
           alignItems: 'center',
           gap: 1.25,
-          height: 40,
-          fontSize: 40,
+          height: 52,
+          fontSize: 52,
           cursor: 'pointer',
           ...sx,
         }}
@@ -27,11 +27,11 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
       >
         <Box
           component="img"
-          src="/logo/signet.png"
+          src="/logo/logo.svg"
           alt="TLTVB"
           sx={{ height: 1, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
         />
-        <Typography
+        {/* <Typography
           component="span"
           sx={{
             fontSize: '1em',
@@ -43,7 +43,7 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
           }}
         >
           TLTVB
-        </Typography>
+        </Typography> */}
       </Box>
     );
 

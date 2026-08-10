@@ -1,8 +1,8 @@
 import { Button, Grid, MenuItem, Stack, TextField } from '@mui/material';
-import CrudListLayout from '../../components/crud/CrudListLayout';
-import { useCrudList } from '../../hooks/useCrudList';
-import { internalDocs, InternalDoc } from '../../sections/workflow/mockData';
-import { StatusChip } from '../../sections/interoperability/components';
+import CrudListLayout from '../../../components/crud/CrudListLayout';
+import { useCrudList } from '../../../hooks/useCrudList';
+import { internalDocs, InternalDoc } from '../../../sections/interoperability/mockData';
+import { StatusChip } from '../../../sections/interoperability/components';
 
 const emptyForm: InternalDoc = {
   code: '',
@@ -18,7 +18,7 @@ export default function InternalDocumentsPage() {
     generateId: () => `VB-NB-${String(Date.now()).slice(-6)}`,
   });
 
-  const tableRows = crud.filtered.map((doc) => ({
+  const tableRows = crud.filtered.map((doc: InternalDoc) => ({
     code: doc.code,
     title: doc.title,
     fromDept: doc.fromDept,
@@ -39,9 +39,9 @@ export default function InternalDocumentsPage() {
       subtitle="Gửi nhận giữa các phòng ban trong cùng đơn vị."
       metrics={[
         { label: 'Tổng văn bản', value: crud.rows.length, helper: 'Nội bộ đơn vị', icon: 'solar:documents-bold' },
-        { label: 'Đang duyệt', value: crud.rows.filter((d) => d.status === 'Đang duyệt').length, helper: 'Chờ phê duyệt', icon: 'solar:hourglass-bold' },
-        { label: 'Hoàn thành', value: crud.rows.filter((d) => d.status === 'Hoàn thành').length, helper: 'Đã xử lý', icon: 'solar:check-circle-bold' },
-        { label: 'Phòng ban', value: new Set(crud.rows.flatMap((d) => [d.fromDept, d.toDept])).size, helper: 'Tham gia trao đổi', icon: 'solar:buildings-bold' },
+        { label: 'Đang duyệt', value: crud.rows.filter((d: InternalDoc) => d.status === 'Đang duyệt').length, helper: 'Chờ phê duyệt', icon: 'solar:hourglass-bold' },
+        { label: 'Hoàn thành', value: crud.rows.filter((d: InternalDoc) => d.status === 'Hoàn thành').length, helper: 'Đã xử lý', icon: 'solar:check-circle-bold' },
+        { label: 'Phòng ban', value: new Set(crud.rows.flatMap((d: InternalDoc) => [d.fromDept, d.toDept])).size, helper: 'Tham gia trao đổi', icon: 'solar:buildings-bold' },
       ]}
       listTitle="Danh sách văn bản nội bộ"
       listSubtitle="CRUD văn bản nội bộ qua popup modal."
@@ -67,30 +67,30 @@ export default function InternalDocumentsPage() {
       deletingId={crud.deletingId}
       onOpenCreate={crud.handleOpenCreate}
       onCloseEditor={() => crud.setOpenEditor(false)}
-      onSubmit={() => crud.handleSubmit((f) => Boolean(f.code && f.title && f.fromDept && f.toDept))}
+      onSubmit={() => crud.handleSubmit((f: InternalDoc) => Boolean(f.code && f.title && f.fromDept && f.toDept))}
       onCloseDelete={() => crud.setDeletingId(null)}
       onConfirmDelete={crud.handleConfirmDelete}
       formContent={
         <Grid container spacing={2} sx={{ mt: 0.5 }}>
           <Grid item xs={12} md={4}>
             <TextField fullWidth label="Số ký hiệu" disabled={Boolean(crud.editingId)} value={crud.formValues.code}
-              onChange={(e) => crud.setFormValues((p) => ({ ...p, code: e.target.value }))} />
+              onChange={(e) => crud.setFormValues((p: InternalDoc) => ({ ...p, code: e.target.value }))} />
           </Grid>
           <Grid item xs={12} md={8}>
             <TextField fullWidth label="Trích yếu" value={crud.formValues.title}
-              onChange={(e) => crud.setFormValues((p) => ({ ...p, title: e.target.value }))} />
+              onChange={(e) => crud.setFormValues((p: InternalDoc) => ({ ...p, title: e.target.value }))} />
           </Grid>
           <Grid item xs={12} md={4}>
             <TextField fullWidth label="Phòng gửi" value={crud.formValues.fromDept}
-              onChange={(e) => crud.setFormValues((p) => ({ ...p, fromDept: e.target.value }))} />
+              onChange={(e) => crud.setFormValues((p: InternalDoc) => ({ ...p, fromDept: e.target.value }))} />
           </Grid>
           <Grid item xs={12} md={4}>
             <TextField fullWidth label="Phòng nhận" value={crud.formValues.toDept}
-              onChange={(e) => crud.setFormValues((p) => ({ ...p, toDept: e.target.value }))} />
+              onChange={(e) => crud.setFormValues((p: InternalDoc) => ({ ...p, toDept: e.target.value }))} />
           </Grid>
           <Grid item xs={12} md={4}>
             <TextField fullWidth label="Trạng thái" select value={crud.formValues.status}
-              onChange={(e) => crud.setFormValues((p) => ({ ...p, status: e.target.value }))}>
+              onChange={(e) => crud.setFormValues((p: InternalDoc) => ({ ...p, status: e.target.value }))}>
               <MenuItem value="Soạn thảo">Soạn thảo</MenuItem>
               <MenuItem value="Đang duyệt">Đang duyệt</MenuItem>
               <MenuItem value="Hoàn thành">Hoàn thành</MenuItem>

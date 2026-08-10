@@ -63,6 +63,16 @@ export const presets = [
     darker: '#7A0930',
     contrastText: '#FFFFFF',
   },
+  // TEAL
+  {
+    name: 'teal',
+    lighter: '#D1F3FE',
+    light: '#5CC5EE',
+    main: 'rgba(5, 128, 180, 1)',
+    dark: '#035D84',
+    darker: '#013A53',
+    contrastText: '#FFFFFF',
+  },
 ];
 
 export const defaultPreset = presets[0];
@@ -71,6 +81,7 @@ export const purplePreset = presets[2];
 export const bluePreset = presets[3];
 export const orangePreset = presets[4];
 export const redPreset = presets[5];
+export const tealPreset = presets[6];
 
 export const presetsOption = presets.map((color) => ({
   name: color.name,
@@ -85,5 +96,6 @@ export function getPresets(key: ThemeColorPresetsValue) {
     blue: bluePreset,
     orange: orangePreset,
     red: redPreset,
-  }[key];
+    teal: tealPreset,
+  }[key] || defaultPreset;
 }

@@ -67,12 +67,14 @@ export default function CrudListLayout({
   onConfirmDelete,
   formContent,
 }: CrudListLayoutProps) {
+  const defaultColors = ['#01AD65', '#028EDD', '#9E50FE', '#FF8551'];
+
   return (
     <PageShell title={title} subtitle={subtitle}>
       <Grid container spacing={3}>
-        {metrics.map((metric) => (
+        {metrics.map((metric, idx) => (
           <Grid key={metric.label} item xs={12} sm={6} lg={3}>
-            <MetricCard {...metric} />
+            <MetricCard backgroundColor={defaultColors[idx % 4]} {...metric} />
           </Grid>
         ))}
       </Grid>

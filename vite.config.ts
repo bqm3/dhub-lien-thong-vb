@@ -203,8 +203,8 @@ const demoDocumentsSavePlugin = {
 
 export default defineConfig({
   plugins: [react(), demoDocumentsSavePlugin],
-  // Keep legacy env prefix for BE-provided configs (.env / runtime)
-  envPrefix: 'REACT_APP_',
+  // Support both legacy REACT_APP_ and standard VITE_ env prefixes
+  envPrefix: ['REACT_APP_', 'VITE_'],
   server: {
     port: 5173,
     // On some Windows setups Vite can bind only to IPv6 loopback (::1),

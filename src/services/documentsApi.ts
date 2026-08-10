@@ -74,7 +74,6 @@ export const documentsApi = {
   }) {
     const formData = new FormData();
     if (item.documentId) formData.append('DOCUMENT_ID', String(item.documentId));
-    formData.append('MESSAGE_ID', item.messageId || `MSG-${Date.now()}`);
     formData.append('DOCUMENT_NO', item.documentNo);
     formData.append('DOCUMENT_TYPE', item.documentType);
     formData.append('SUBJECT', item.subject);
@@ -115,10 +114,80 @@ export const documentsApi = {
   },
 
   /**
+   * Lấy chi tiết route giao dịch (DOCUMENT_ROUTEController/GetInfo/{id})
+   */
+  async getRouteInfo(id: number | string) {
+    const response = await axiosInstance.get(`/DOCUMENT_ROUTE/GetInfo/${id}`);
+    return response.data;
+  },
+
+  /**
    * Truy vấn lịch sử giao dịch thông điệp (MESSAGE_TRANSACTIONController)
    */
   async getTransactions(searchField: Record<string, any> = {}) {
     const response = await axiosInstance.post('/MESSAGE_TRANSACTION/GetListBy', searchField);
+    return response.data;
+  },
+
+  /**
+   * Gửi văn bản liên thông giữa các đơn vị (IN_DIP_HubController/Send)
+   */
+  async sendDocument(payload: {
+    header: {
+      documentId?: any;
+      documentNo: any;
+      documentType: string;
+      subject: string;
+      senderCode: string;
+      receiverCode: string[];
+      priority?: string;
+      sendTime?: string;
+      issueDate?: string;
+    };
+    body?: Array<{
+      fileName: string;
+      dataType?: string;
+      contentType?: string;
+      fileUrl?: string;
+      base64Data?: string;
+    }>;
+  }) {
+    const sendTimeVal = payload.header.sendTime || payload.header.issueDate || new Date().toISOString().split('T')[0];
+    const apiPayload = {
+      Header: {
+        Document_Id: payload.header.documentId ? String(payload.header.documentId) : '',
+        Document_No: payload.header.documentNo,
+        Document_Type: payload.header.documentType,
+        Subject: payload.header.subject,
+        Sender_Code: payload.header.senderCode,
+        Receiver_Code: payload.header.receiverCode,
+        Priority: payload.header.priority || 'NORMAL',
+        Send_Time: sendTimeVal,
+        Issue_Date: sendTimeVal,
+      },
+      Body: (payload.body || []).map((file) => ({
+        File_Name: file.fileName,
+        Data_Type: file.dataType || 'PDF',
+        Content_Type: file.contentType || 'application/pdf',
+        File_URL: file.fileUrl || '',
+        Base64_Data: file.base64Data || '',
+      })),
+    };
+
+    const response = await axiosInstance.post('/IN_DIP_Hub/Send', apiPayload);
+    return response.data;
+  },
+
+  /**
+   * Phản hồi trạng thái ACK/NACK (IN_DIP_HubController/Ack)
+   */
+  async ackDocument(payload: { documentId: string; receiverCode: string; status: string }) {
+    const apiPayload = {
+      Document_Id: payload.documentId,
+      Receiver_Code: payload.receiverCode,
+      Status: payload.status,
+    };
+    const response = await axiosInstance.post('/IN_DIP_Hub/Ack', apiPayload);
     return response.data;
   },
 };
@@ -130,9 +199,23 @@ export const documentAttachmentsApi = {
   /**
    * Lấy danh sách tệp đính kèm theo DOCUMENT_ID
    */
-  async getListByDocument(code: string) {
+  async getListByDocument(documentId: string) {
     const response = await axiosInstance.post('/DOCUMENT_ATTACHMENT/GetListBy', {
-      CODE: code,
+      DOCUMENT_ID: documentId,
+    });
+    return response.data;
+  },
+
+  async getAuditsByDocument(documentId: string) {
+    const response = await axiosInstance.post('/DOCUMENT_AUDIT/GetListBy', {
+      DOCUMENT_ID: documentId,
+    });
+    return response.data;
+  },
+
+  async getTrackingsByDocument(documentId: string) {
+    const response = await axiosInstance.post('/DOCUMENT_TRACKING/GetListBy', {
+      DOCUMENT_ID: documentId,
     });
     return response.data;
   },

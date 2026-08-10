@@ -22,11 +22,13 @@ export type AuthStateType = {
 // ----------------------------------------------------------------------
 
 export type JWTContextType = {
-  method: 'jwt';
+  method: 'jwt' | 'keycloak';
   isAuthenticated: boolean;
   isInitialized: boolean;
   user: AuthUserType;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, realm?: string) => Promise<void>;
+  loginWithKeycloakSSO?: (realm?: string) => void;
+  loginWithKeycloakCode?: (code: string, realm?: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
   loginWithGoogle?: () => void;

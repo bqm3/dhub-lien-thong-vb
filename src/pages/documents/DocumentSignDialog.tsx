@@ -33,8 +33,17 @@ export default function DocumentSignDialog({
   const theme = useTheme();
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const firstFile = formValues?.attachments?.[0];
-  const firstFileName = typeof firstFile === 'string' ? firstFile : firstFile?.originalFileName || firstFile?.name || '';
+  const rawAttachments =
+    formValues?.attachments ||
+    (formValues as any)?.DOCUMENT_ATTACHMENT ||
+    (formValues as any)?.documentAttachment ||
+    [];
+
+  const firstFile = rawAttachments?.[0];
+  const firstFileName =
+    typeof firstFile === 'string'
+      ? firstFile
+      : firstFile?.originalFileName || firstFile?.ORIGINAL_FILE_NAME || firstFile?.name || '';
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth={isSmDown ? 'lg' : 'xl'} fullScreen={isSmDown}>
@@ -43,23 +52,39 @@ export default function DocumentSignDialog({
           <Box>
             <Typography variant="h6">Giao diện ký số văn bản</Typography>
             <Typography variant="body2" color="text.secondary">
-              {formValues?.code || ''} · {firstFileName || 'Chưa có file'}
+              {formValues?.code || (formValues as any)?.CODE || ''} · {firstFileName || 'Chưa có file'}
             </Typography>
           </Box>
-          <StatusChip status={(formValues as any)?.signStatus || 'Chưa ký'} />
+          <StatusChip status={(formValues as any)?.signStatus || (formValues as any)?.STATUS || 'Chưa ký'} />
         </Stack>
       </DialogTitle>
       <DialogContent dividers sx={{ p: isSmDown ? 1.5 : undefined }}>
         <SignatureStudio
-          files={(formValues?.attachments || []).map((item: any) => {
-            const fileName = typeof item === 'string' ? item : item?.originalFileName || item?.name || '';
-            const objectKey = typeof item === 'string' ? item : item?.objectKey || item?.OBJECT_KEY || fileName;
+          files={(rawAttachments || []).map((item: any) => {
+            const fileName =
+              typeof item === 'string'
+                ? item
+                : item?.originalFileName || item?.ORIGINAL_FILE_NAME || item?.name || item?.fileName || '';
+            const objectKey =
+              typeof item === 'string'
+                ? item
+                : item?.objectKey || item?.OBJECT_KEY || item?.filePath || item?.FILE_PATH || fileName;
+            const attachmentCode = typeof item === 'string' ? '' : item?.code || item?.CODE || '';
+            const attachmentId = typeof item === 'string' ? undefined : item?.id || item?.ID;
             return {
               fileName,
-              fileUrl: (fileName && formAttachmentPreviewUrls?.[fileName]) ?? getS3AttachmentUrl(objectKey || fileName) ?? '',
+              objectKey,
+              attachmentCode,
+              attachmentId,
+              fileUrl:
+                (fileName && formAttachmentPreviewUrls?.[fileName]) ??
+                (objectKey && formAttachmentPreviewUrls?.[objectKey]) ??
+                getS3AttachmentUrl(objectKey || fileName) ??
+                '',
             };
           })}
           onSignComplete={(signatures) => onSignComplete(signatures.length)}
+          onClose={onClose}
         />
       </DialogContent>
       <DialogActions>
