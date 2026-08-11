@@ -40,7 +40,10 @@ export const StyledItem = styled(ListItemButton, {
   return {
     flexDirection: 'column',
     textTransform: 'capitalize',
-    padding: theme.spacing(1, 0, 0.5, 0),
+    paddingTop: '5px !important',
+    paddingBottom: '5px !important',
+    paddingLeft: 0,
+    paddingRight: 0,
     color: '#FFFFFF',
     borderRadius: theme.shape.borderRadius,
     '& .MuiListItemIcon-root': {
@@ -50,7 +53,10 @@ export const StyledItem = styled(ListItemButton, {
     // Sub item
     ...(subItem && {
       flexDirection: 'row',
-      padding: theme.spacing(1),
+      paddingTop: '5px !important',
+      paddingBottom: '5px !important',
+      paddingLeft: theme.spacing(1),
+      paddingRight: theme.spacing(1),
     }),
     // Active item
     ...(active && {

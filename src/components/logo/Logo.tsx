@@ -29,7 +29,7 @@ const Logo = forwardRef<HTMLDivElement, LogoProps>(
           component="img"
           src="/logo/logo.svg"
           alt="TLTVB"
-          sx={{ height: 1, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
+          sx={{ height: '40px', width: 'auto', objectFit: 'contain', flexShrink: 0, mb: '30px' }}
         />
         {/* <Typography
           component="span"

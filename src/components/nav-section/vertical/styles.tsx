@@ -46,10 +46,13 @@ export const StyledItem = styled(ListItemButton, {
     textTransform: 'capitalize',
     paddingLeft: theme.spacing(2),
     paddingRight: theme.spacing(1.5),
-    marginBottom: theme.spacing(0.5),
+    paddingTop: '5px !important',
+    paddingBottom: '5px !important',
+    marginBottom: '2px',
     color: '#FFFFFF',
     borderRadius: theme.shape.borderRadius,
-    height: NAV.H_DASHBOARD_ITEM,
+    height: 'auto',
+    minHeight: 'auto',
     '& .MuiTypography-root': {
       color: '#FFFFFF',
     },
@@ -70,12 +73,13 @@ export const StyledItem = styled(ListItemButton, {
     },
     // Sub item
     ...(subItem && {
-      height: NAV.H_DASHBOARD_ITEM_SUB,
+      height: 'auto',
+      minHeight: 'auto',
       ...(depth > 2 && {
         paddingLeft: theme.spacing(depth),
       }),
       ...(caption && {
-        height: NAV.H_DASHBOARD_ITEM,
+        height: 'auto',
       }),
     }),
     // Active item
@@ -147,8 +151,8 @@ export const StyledDotIcon = styled('span', {
 export const StyledSubheader = styled(ListSubheader)(({ theme }) => ({
   ...theme.typography.overline,
   fontSize: 11,
-  paddingTop: theme.spacing(3),
-  paddingBottom: theme.spacing(1),
+  paddingTop: theme.spacing(1.5),
+  paddingBottom: theme.spacing(0.5),
   color: '#FFFFFF',
   backgroundColor: 'transparent',
 }));
