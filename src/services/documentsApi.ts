@@ -1,13 +1,8 @@
 import axiosInstance from '../utils/axios';
-import { getDefaultDateRange } from './getDefaultDateRange';
+import { BaseSearchRequest, buildBaseBody } from './types';
 
-export interface DocumentSearchRequest {
-  pageIndex?: number;
-  pageSize?: number;
-  searchField?: Record<string, any>;
-  cdateStart?: string;
-  cdateEnd?: string;
-}
+export type DocumentSearchRequest = BaseSearchRequest;
+export type { BaseSearchRequest };
 
 /**
  * Service API danh sách văn bản (DOCUMENTSController)
@@ -17,14 +12,8 @@ export const documentsApi = {
    * Truy vấn danh sách văn bản (DOCUMENTSController)
    */
   async getList(params: DocumentSearchRequest = {}) {
-    const defaultDates = getDefaultDateRange();
-    const response = await axiosInstance.post('/DOCUMENTS/GetList', {
-      PageIndex: params.pageIndex || 1,
-      PageSize: params.pageSize || 100,
-      SearchField: params.searchField || {},
-      CDATE_START: params.cdateStart || defaultDates.cdateStart,
-      CDATE_END: params.cdateEnd || defaultDates.cdateEnd,
-    });
+    const body = buildBaseBody(params);
+    const response = await axiosInstance.post('/DOCUMENTS/GetList', body);
     return response.data;
   },
 
@@ -108,8 +97,26 @@ export const documentsApi = {
   /**
    * Truy vấn danh sách định tuyến văn bản (DOCUMENT_ROUTEController)
    */
-  async getRoutes(searchField: Record<string, any> = {}) {
-    const response = await axiosInstance.post('/DOCUMENT_ROUTE/GetListBy', searchField);
+  async getRoutes(params: {
+    SearchField?: Record<string, any>;
+    searchField?: Record<string, any>;
+    PageIndex?: number;
+    pageIndex?: number;
+    PageSize?: number;
+    pageSize?: number;
+    cdateStart?: string;
+    cdateEnd?: string;
+    [key: string]: any;
+  } = {}) {
+    const body = buildBaseBody({
+      pageIndex: params.PageIndex ?? params.pageIndex,
+      pageSize: params.PageSize ?? params.pageSize,
+      searchField: params.SearchField || params.searchField,
+      cdateStart: params.cdateStart || (params as any).CDATE_START,
+      cdateEnd: params.cdateEnd || (params as any).CDATE_END,
+    });
+
+    const response = await axiosInstance.post('/DOCUMENT_ROUTE/GetList', body);
     return response.data;
   },
 

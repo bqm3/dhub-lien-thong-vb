@@ -23,6 +23,8 @@ export const PATH_DASHBOARD = {
   integration: path(ROOTS_DASHBOARD, '/admin/units'),
   documents: path(ROOTS_DASHBOARD, '/document-management'),
   exchange: path(ROOTS_DASHBOARD, '/operations/document-exchange'),
+  exchangeOutgoing: path(ROOTS_DASHBOARD, '/operations/document-exchange/outgoing'),
+  exchangeIncoming: path(ROOTS_DASHBOARD, '/operations/document-exchange/incoming'),
   admin: {
     root: path(ROOTS_DASHBOARD, '/admin'),
     users: path(ROOTS_DASHBOARD, '/admin/users'),
@@ -47,6 +49,8 @@ export const PATH_DASHBOARD = {
   operations: {
     root: path(ROOTS_DASHBOARD, '/operations'),
     exchange: path(ROOTS_DASHBOARD, '/operations/document-exchange'),
+    exchangeOutgoing: path(ROOTS_DASHBOARD, '/operations/document-exchange/outgoing'),
+    exchangeIncoming: path(ROOTS_DASHBOARD, '/operations/document-exchange/incoming'),
     reporting: {
       root: path(ROOTS_DASHBOARD, '/operations/reporting'),
       executive: path(ROOTS_DASHBOARD, '/operations/reporting/executive'),

@@ -137,31 +137,35 @@ export function MetricCard({ label, value, helper, icon, backgroundColor, textCo
   const finalTextColor = textColor || color || (backgroundColor ? '#FFFFFF' : undefined);
 
   return (
-    <Card sx={{ p: 3, height: '100%', backgroundColor, color: finalTextColor }}>
-      <Stack spacing={2}>
+    <Card sx={{ py: 1.5, px: 2, backgroundColor, color: finalTextColor }}>
+      <Stack spacing={0.75}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="subtitle2" sx={{ color: finalTextColor || 'text.secondary', opacity: finalTextColor ? 0.9 : 1 }}>
+          <Typography variant="subtitle2" sx={{ fontSize: '0.8rem', color: finalTextColor || 'text.secondary', opacity: finalTextColor ? 0.9 : 1 }}>
             {label}
           </Typography>
           <Box
             sx={{
-              width: 44,
-              height: 44,
+              width: 32,
+              height: 32,
               display: 'grid',
               placeItems: 'center',
-              borderRadius: 2,
+              borderRadius: 1.5,
               bgcolor: backgroundColor ? 'rgba(255, 255, 255, 0.2)' : 'primary.lighter',
               color: finalTextColor || 'primary.main',
             }}
           >
-            <Iconify icon={icon} width={22} />
+            <Iconify icon={icon} width={18} />
           </Box>
         </Stack>
 
-        <Typography variant="h3" sx={{ color: finalTextColor }}>{value}</Typography>
-        <Typography variant="body2" sx={{ color: finalTextColor || 'text.secondary', opacity: finalTextColor ? 0.85 : 1 }}>
-          {helper}
-        </Typography>
+        <Stack direction="row" alignItems="baseline" spacing={1}>
+          <Typography variant="h4" sx={{ color: finalTextColor, fontWeight: 700, lineHeight: 1.1 }}>{value}</Typography>
+          {helper && (
+            <Typography variant="caption" sx={{ color: finalTextColor || 'text.secondary', opacity: finalTextColor ? 0.85 : 1, fontSize: '0.7rem' }}>
+              {helper}
+            </Typography>
+          )}
+        </Stack>
       </Stack>
     </Card>
   );

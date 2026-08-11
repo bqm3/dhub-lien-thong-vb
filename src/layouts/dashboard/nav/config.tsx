@@ -32,7 +32,7 @@ const navConfig = [
         title: 'Tổng quan hệ thống',
         path: PATH_DASHBOARD.reporting.executive,
         icon: ICONS.ic_tq,
-        titleHeader: 'TRỤC LIÊN THÔNG VĂN BẢN ĐIỆN TỬ'
+        titleHeader: 'TRỤC LIÊN THÔNG VĂN BẢN'
       },
     ],
   },
@@ -62,6 +62,16 @@ const navConfig = [
       {
         title: 'Trao đổi văn bản',
         path: PATH_DASHBOARD.exchange,
+        icon: ICONS.ic_tdvb,
+      },
+      {
+        title: 'Văn bản gửi đi',
+        path: PATH_DASHBOARD.exchangeOutgoing,
+        icon: ICONS.ic_tdvb,
+      },
+      {
+        title: 'Văn bản nhận về',
+        path: PATH_DASHBOARD.exchangeIncoming,
         icon: ICONS.ic_tdvb,
       },
     ],

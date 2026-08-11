@@ -68,8 +68,10 @@ export type ExchangeTransaction = {
   sentAt?: string;
   receivedAt?: string;
   updatedAt?: string;
+  type?: string;
   errorReason?: string;
   errorDetail?: string;
+  [key: string]: any;
 };
 
 // Prefer richer JSON for demo UI

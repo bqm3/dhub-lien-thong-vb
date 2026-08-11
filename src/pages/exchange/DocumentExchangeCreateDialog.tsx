@@ -14,7 +14,7 @@ import {
   Stack,
   TextField,
   Typography,
-    alpha,
+  alpha,
 } from '@mui/material';
 import Iconify from '../../components/iconify';
 import { ExchangeTransaction } from '../../sections/interoperability/mockData';
@@ -122,29 +122,28 @@ export default function DocumentExchangeCreateDialog({
       <Box
         sx={{
           p: 3,
-          color: '#fff',
           position: 'relative',
         }}
       >
         <Stack direction="row" alignItems="center" spacing={2}>
           <Box
-              sx={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 1.5,
-                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
-                    color: 'primary.main',
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 1.5,
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+              color: 'primary.main',
+              display: 'grid',
+              placeItems: 'center',
+            }}
           >
-            <Iconify icon="solar:plain-3-bold" width={28} sx={{ color: '#fff' }} />
+            <Iconify icon="solar:plain-3-bold" width={28}  />
           </Box>
           <Box>
             <Typography variant="h6" >
               Khởi tạo giao dịch liên thông mới
             </Typography>
-               <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary">
               Gửi trực tiếp văn bản tới các đơn vị nhận trên Trục liên thông văn bản quốc gia (DIP Hub)
             </Typography>
           </Box>

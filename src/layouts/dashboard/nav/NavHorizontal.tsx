@@ -18,7 +18,7 @@ import filterNavByPermission from './filterNavByPermission';
 function NavHorizontal() {
   const theme = useTheme();
   const { user } = useAuthContext();
-  const filteredNavConfig = filterNavByPermission(navConfig, user?.permissions);
+  const filteredNavConfig = filterNavByPermission(navConfig, user?.permissions, user);
 
   return (
     <AppBar

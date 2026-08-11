@@ -58,7 +58,7 @@ function FieldBlock({
         sx={{
           width: 30,
           height: 30,
-          borderRadius: '8px',
+          borderRadius: 0,
           bgcolor: 'action.hover',
           color: 'text.secondary',
           display: 'flex',
@@ -145,7 +145,7 @@ function TrackingPipelineTimeline({ trackings, detailTx }: { trackings: any[]; d
       status: sendLog ? (sendLog.STATUS || sendLog.status || 'SENT') : 'SENT',
       timeStr: safeFormatTime(sendLog?.CDATE || sendLog?.cdate || sendLog?.ACTION_TIME || detailTx?.sentAt || detailTx?.sendTime),
       descStr: sendLog?.DESCRIPTION || sendLog?.description || `Đã gửi văn bản thành công từ ${senderName}.`,
-      userStr: sendLog?.CREATOR || sendLog?.cuser || 'SENDER_SYSTEM',
+      userStr: sendLog?.CREATOR || sendLog?.CUSER || 'SENDER_SYSTEM',
       state: 'completed' as const,
     };
 
@@ -159,7 +159,7 @@ function TrackingPipelineTimeline({ trackings, detailTx }: { trackings: any[]; d
       status: receiveLog ? (receiveLog.STATUS || receiveLog.status || 'RECEIVED') : step2Done ? 'RECEIVED' : isTxFailed ? 'FAILED' : 'WAITING',
       timeStr: safeFormatTime(receiveLog?.CDATE || receiveLog?.cdate || receiveLog?.ACTION_TIME || (step2Done ? detailTx?.updatedAt : null)),
       descStr: receiveLog?.DESCRIPTION || receiveLog?.description || (step2Done ? `Đơn vị nhận (${receivers}) đã tiếp nhận thành công gói tin văn bản.` : isTxFailed ? 'Lỗi kết nối / Không thể chuyển gói tin đến Đơn vị nhận.' : 'Chờ Đơn vị nhận tiếp nhận văn bản.'),
-      userStr: receiveLog?.CREATOR || receiveLog?.cuser || 'RECEIVER_SYSTEM',
+      userStr: receiveLog?.CREATOR || receiveLog?.CUSER || 'RECEIVER_SYSTEM',
       state: step2Done ? ('completed' as const) : isTxFailed ? ('failed' as const) : ('pending' as const),
     };
 
@@ -176,8 +176,8 @@ function TrackingPipelineTimeline({ trackings, detailTx }: { trackings: any[]; d
       orgName: receivers,
       status: ackLog ? (ackLog.STATUS || ackLog.status || 'ACK_RECEIVED') : step3Done ? 'ACK_RECEIVED' : isAckFailed ? 'NACK' : 'WAITING',
       timeStr: safeFormatTime(ackLog?.CDATE || ackLog?.cdate || ackLog?.ACTION_TIME || (step3Done ? detailTx?.updatedAt : null)),
-      descStr: ackLog?.DESCRIPTION || ackLog?.description || (step3Done ? 'Đã nhận thông điệp phản hồi xác nhận (ACK_RECEIVED) thành công.' : isAckFailed ? 'Giao dịch bị từ chối / Phản hồi NACK từ đơn vị nhận.' : 'Chờ thông điệp phản hồi xác nhận (ACK_RECEIVED).'),
-      userStr: ackLog?.CREATOR || ackLog?.cuser || 'RECEIVER_ACK',
+      descStr: ackLog?.DESCRIPTION || ackLog?.description || (step3Done ? 'Đã nhận phản hồi xác nhận (ACK_RECEIVED) thành công.' : isAckFailed ? 'Giao dịch bị từ chối / Phản hồi NACK từ đơn vị nhận.' : 'Chờ phản hồi xác nhận (ACK_RECEIVED).'),
+      userStr: ackLog?.CREATOR || ackLog?.CUSER || 'RECEIVER_ACK',
       state: step3Done ? ('completed' as const) : isAckFailed ? ('failed' as const) : ('pending' as const),
     };
 
@@ -205,7 +205,7 @@ function TrackingPipelineTimeline({ trackings, detailTx }: { trackings: any[]; d
         sx={{
           mb: 3.5,
           p: { xs: 1.75, sm: 2.25 },
-          borderRadius: 3,
+          borderRadius: 0,
           bgcolor: hasFailure ? '#fff1f2' : 'background.neutral',
           border: '1px solid',
           borderColor: hasFailure ? '#fecdd3' : 'divider',
@@ -230,14 +230,14 @@ function TrackingPipelineTimeline({ trackings, detailTx }: { trackings: any[]; d
             {doneCount}/{steps.length} bước hoàn tất
           </Typography>
         </Stack>
-        <Box sx={{ position: 'relative', height: 6, borderRadius: 3, bgcolor: 'grey.200', overflow: 'hidden' }}>
+        <Box sx={{ position: 'relative', height: 6, borderRadius: 0, bgcolor: 'grey.200', overflow: 'hidden' }}>
           <Box
             sx={{
               position: 'absolute',
               inset: 0,
               width: `${progressPercent}%`,
               bgcolor: hasFailure ? '#f43f5e' : '#10b981',
-              borderRadius: 3,
+              borderRadius: 0,
               transition: 'width 0.5s cubic-bezier(0.4,0,0.2,1)',
             }}
           />
@@ -280,7 +280,7 @@ function TrackingPipelineTimeline({ trackings, detailTx }: { trackings: any[]; d
                       flex: 1,
                       minHeight: 26,
                       my: 0.5,
-                      borderRadius: 1,
+                      borderRadius: 0,
                       bgcolor: t.state === 'completed' ? st.color : 'grey.200',
                       transition: 'background-color 0.3s',
                     }}
@@ -296,7 +296,7 @@ function TrackingPipelineTimeline({ trackings, detailTx }: { trackings: any[]; d
                   minWidth: 0,
                   mb: isLast ? 0 : 2.5,
                   p: { xs: 1.75, sm: 2.25 },
-                  borderRadius: 2.5,
+                  borderRadius: 0,
                   borderColor: isPending ? 'divider' : st.color + '35',
                   bgcolor: isPending ? 'transparent' : st.bg,
                   opacity: isPending ? 0.85 : 1,
@@ -400,29 +400,39 @@ export default function DocumentExchangeDetailDialog({
     if (detailTx) {
       const docIdStr = String(detailTx.documentId || detailTx.code || detailTx.id || '');
 
-      // API 1: Chi tiết định tuyến (GetInfo/{id})
+      // API 1: Chi tiết định tuyến (GetInfo/{id}) - Tải đầy đủ Route, Trackings và Attachments trong 1 request
       if (detailTx.id) {
-        documentsApi.getRouteInfo(detailTx.id).catch(() => {});
+        documentsApi
+          .getRouteInfo(detailTx.id)
+          .then((res) => {
+            if (res?.Trackings && Array.isArray(res.Trackings) && res.Trackings.length > 0) {
+              setDetailTrackings(res.Trackings);
+            }
+            if (res?.Attachments && Array.isArray(res.Attachments) && res.Attachments.length > 0) {
+              setDetailAttachments(res.Attachments);
+            }
+          })
+          .catch(() => {});
       }
 
       // API 2: Lịch sử theo dõi tracking riêng (/DOCUMENT_TRACKING/GetListBy)
-      if (docIdStr) {
-        documentAttachmentsApi
-          .getTrackingsByDocument(docIdStr)
-          .then((res) => {
-            const list = res?.Data || res?.data || (Array.isArray(res) ? res : []);
-            setDetailTrackings(Array.isArray(list) ? list : []);
-          })
-          .catch(() => setDetailTrackings([]));
+      // if (docIdStr) {
+      //   documentAttachmentsApi
+      //     .getTrackingsByDocument(docIdStr)
+      //     .then((res) => {
+      //       const list = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      //       setDetailTrackings(Array.isArray(list) ? list : []);
+      //     })
+      //     .catch(() => setDetailTrackings([]));
 
-        documentAttachmentsApi
-          .getListByDocument(docIdStr)
-          .then((res) => {
-            const list = res?.Data || res?.data || (Array.isArray(res) ? res : []);
-            setDetailAttachments(Array.isArray(list) ? list : []);
-          })
-          .catch(() => setDetailAttachments([]));
-      }
+      //   documentAttachmentsApi
+      //     .getListByDocument(docIdStr)
+      //     .then((res) => {
+      //       const list = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      //       setDetailAttachments(Array.isArray(list) ? list : []);
+      //     })
+      //     .catch(() => setDetailAttachments([]));
+      // }
     } else {
       setDetailAttachments([]);
       setDetailTrackings([]);
@@ -475,7 +485,7 @@ export default function DocumentExchangeDetailDialog({
           sx: {
             height: { md: '88vh' },
             maxHeight: { md: 880 },
-            borderRadius: 3,
+            borderRadius: 0,
           },
         }}
       >
@@ -483,13 +493,13 @@ export default function DocumentExchangeDetailDialog({
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
             <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <Avatar
-                variant="rounded"
+                variant="square"
                 sx={{
                   width: 42,
                   height: 42,
                   bgcolor: 'primary.lighter',
                   color: 'primary.dark',
-                  borderRadius: '10px',
+                  borderRadius: 0,
                 }}
               >
                 <Iconify icon="solar:document-text-bold-duotone" width={24} />
@@ -503,15 +513,20 @@ export default function DocumentExchangeDetailDialog({
                 </Typography>
               </Box>
             </Stack>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
-              <StatusChip status={detailTx.status || 'sent'} />
-              <IconButton size="small" onClick={onClose}>
-                <Iconify icon="eva:close-fill" width={20} />
-              </IconButton>
-            </Stack>
           </Stack>
         </DialogTitle>
-        <DialogContent sx={{ pt: 0, px: 3 }}>
+        <DialogContent
+          sx={{
+            pt: 0,
+            px: 3,
+            pb: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            overflow: detailTab === 1 ? 'hidden' : 'auto',
+          }}
+        >
           <Box
             sx={{
               position: 'sticky',
@@ -523,6 +538,7 @@ export default function DocumentExchangeDetailDialog({
               mb: 2.5,
               borderBottom: '1px solid',
               borderColor: 'divider',
+              flexShrink: 0,
             }}
           >
             <Tabs
@@ -530,7 +546,7 @@ export default function DocumentExchangeDetailDialog({
               onChange={(_, v) => setDetailTab(v)}
               sx={{
                 minHeight: 40,
-                '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
+                '& .MuiTabs-indicator': { height: 3, borderRadius: 0 },
               }}
             >
               <Tab
@@ -565,7 +581,7 @@ export default function DocumentExchangeDetailDialog({
           {detailTab === 0 && (
             <Stack spacing={2.5}>
               {/* Thẻ Thông tin văn bản chính */}
-              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5 }}>
+              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 0 }}>
                 <SectionHeader icon="solar:info-circle-bold" title="Thông tin văn bản" />
                 <Grid container spacing={2.5}>
                   <Grid item xs={12} sm={6}>
@@ -582,7 +598,7 @@ export default function DocumentExchangeDetailDialog({
                         size="small"
                         color="info"
                         variant="soft"
-                        sx={{ fontWeight: 600, borderRadius: '6px' }}
+                        sx={{ fontWeight: 600, borderRadius: 0 }}
                       />
                     </FieldBlock>
                   </Grid>
@@ -611,7 +627,7 @@ export default function DocumentExchangeDetailDialog({
               </Paper>
 
               {/* Bảng Danh sách đơn vị nhận */}
-              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5 }}>
+              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 0 }}>
                 <SectionHeader
                   icon="solar:users-group-rounded-bold"
                   title={`Đơn vị tiếp nhận & Trạng thái (${routesCount} đơn vị)`}
@@ -628,7 +644,7 @@ export default function DocumentExchangeDetailDialog({
                     />
                   }
                 />
-                <Box sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ borderRadius: 0, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
                   <DataTable
                     columns={[
                       { key: 'receiver', label: 'Đơn vị nhận' },
@@ -657,7 +673,7 @@ export default function DocumentExchangeDetailDialog({
                 sx={{
                   px: 2,
                   py: 1.5,
-                  borderRadius: 2,
+                  borderRadius: 0,
                   bgcolor: 'background.neutral',
                   flexWrap: 'wrap',
                   rowGap: 1,
@@ -682,10 +698,13 @@ export default function DocumentExchangeDetailDialog({
             <Box
               sx={{
                 flex: 1,
-                minHeight: 500,
+                minHeight: 0,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
                 border: '1px solid',
                 borderColor: 'divider',
-                borderRadius: 2.5,
+                borderRadius: 0,
                 overflow: 'hidden',
               }}
             >
@@ -723,14 +742,14 @@ export default function DocumentExchangeDetailDialog({
 
           {detailTab === 3 && detailTx.errorReason && (
             <Stack spacing={2}>
-              <Alert severity="error" variant="filled" icon={<Iconify icon="solar:bug-bold" />} sx={{ borderRadius: 2 }}>
+              <Alert severity="error" variant="filled" icon={<Iconify icon="solar:bug-bold" />} sx={{ borderRadius: 0 }}>
                 <Typography variant="subtitle2">{detailTx.errorReason}</Typography>
               </Alert>
               <Paper
                 variant="outlined"
                 sx={{
                   p: 2.5,
-                  borderRadius: 2.5,
+                  borderRadius: 0,
                   bgcolor: 'error.lighter',
                   borderColor: 'error.light',
                 }}
@@ -750,7 +769,7 @@ export default function DocumentExchangeDetailDialog({
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} color="inherit">
+          <Button onClick={onClose} color="inherit" sx={{ borderRadius: 0 }}>
             Đóng
           </Button>
           <Button
@@ -761,7 +780,7 @@ export default function DocumentExchangeDetailDialog({
               onAck(detailTx, 'ACK');
               onClose();
             }}
-            sx={{ borderRadius: 2 }}
+            sx={{ borderRadius: 0 }}
           >
             Gửi xác nhận đã nhận văn bản
           </Button>
@@ -774,7 +793,7 @@ export default function DocumentExchangeDetailDialog({
                 onReplay(detailTx.id || detailTx.code || '');
                 onClose();
               }}
-              sx={{ borderRadius: 2 }}
+              sx={{ borderRadius: 0 }}
             >
               Replay giao dịch
             </Button>
@@ -787,19 +806,19 @@ export default function DocumentExchangeDetailDialog({
         onClose={() => setPreviewFile(null)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        PaperProps={{ sx: { borderRadius: 0 } }}
       >
         <DialogTitle sx={{ pb: 2 }}>Xem file đính kèm</DialogTitle>
         <DialogContent>
           {previewFile && (
             <Stack spacing={2} sx={{ pt: 1 }}>
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 0 }}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
                   <Box
                     sx={{
                       width: 44,
                       height: 44,
-                      borderRadius: '10px',
+                      borderRadius: 0,
                       bgcolor: 'primary.lighter',
                       color: 'primary.dark',
                       display: 'flex',

@@ -78,10 +78,20 @@ export default function Router() {
         {
           path: 'operations',
           children: [
-            { element: <Navigate to="/dashboard/operations/document-exchange" replace />, index: true },
+            { element: <Navigate to="/dashboard/operations/document-exchange/outgoing" replace />, index: true },
             {
               path: 'document-exchange',
-              element: <GuardedPage path="/dashboard/operations/document-exchange" element={<DocumentExchangePage />} />,
+              children: [
+                { element: <GuardedPage path="/dashboard/operations/document-exchange" element={<DocumentExchangePage defaultRoleFilter="ALL" />} />, index: true },
+                {
+                  path: 'outgoing',
+                  element: <GuardedPage path="/dashboard/operations/document-exchange" element={<DocumentExchangePage defaultRoleFilter="SENDER" pageTitle="Văn bản đi" />} />,
+                },
+                {
+                  path: 'incoming',
+                  element: <GuardedPage path="/dashboard/operations/document-exchange" element={<DocumentExchangePage defaultRoleFilter="RECEIVER" pageTitle="Văn bản đến" />} />,
+                },
+              ],
             },
             {
               path: 'reporting',

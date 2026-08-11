@@ -109,23 +109,22 @@ export default function Header({ onOpenNav }: Props) {
             }
           }}
         />
-        <Typography
-          sx={{
-            fontFamily: "'Averta CY', sans-serif",
-            fontStyle: 'normal',
-            fontWeight: 600,
-            fontSize: { xs: '15px', sm: '18px', md: '20px' },
-            lineHeight: '28px',
-            letterSpacing: '0.25px',
-            color: '#FFCC0A',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {currentTitle.toUpperCase()}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'visible', flexShrink: 0 }}>
+          <svg width="600" height="26" style={{ overflow: 'visible' }}>
+            <text
+              x="0"
+              y="20"
+              fill="#FFCC0A"
+              fontFamily="Public Sans, sans-serif"
+              fontWeight="700"
+              fontSize="20"
+              letterSpacing="0.5"
+            >
+              {currentTitle.toUpperCase()}
+            </text>
+          </svg>
+        </Box>
       </Stack>
-
-      <Searchbar />
 
       <Stack
         flexGrow={1}
@@ -135,6 +134,8 @@ export default function Header({ onOpenNav }: Props) {
         spacing={{ xs: 0.5, sm: 1.5 }}
       >
         {/* <LanguagePopover /> */}
+
+        <Searchbar />
 
         <NotificationsPopover />
 

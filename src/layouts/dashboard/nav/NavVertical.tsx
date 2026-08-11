@@ -29,7 +29,7 @@ export default function NavVertical({ openNav, onCloseNav }: Props) {
   const { user } = useAuthContext();
 
   const isDesktop = useResponsive('up', 'lg');
-  const filteredNavConfig = filterNavByPermission(navConfig, user?.permissions);
+  const filteredNavConfig = filterNavByPermission(navConfig, user?.permissions, user);
 
   useEffect(() => {
     if (openNav) {

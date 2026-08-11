@@ -125,7 +125,7 @@ export function parseKeycloakUser(accessToken: string, realmName?: string) {
     const isAdmin =
       roles.some((r) => r.toUpperCase() === 'ADMIN' || r.toUpperCase() === 'SUPERADMIN') ||
       decoded.preferred_username === 'admin';
-
+    const isSystemAdmin = roles.some((r) => r == "systemAdmin")
     const role: DemoRole = isAdmin ? 'ADMIN' : 'AGENCY';
     const email = decoded.email || `${decoded.preferred_username || 'user'}@cdsdservice.com`;
     const name = decoded.name || decoded.preferred_username || 'Keycloak User';
@@ -143,6 +143,7 @@ export function parseKeycloakUser(accessToken: string, realmName?: string) {
       username: decoded.preferred_username || email,
       realm: realmName || (decoded.iss?.includes('EXTERNAL') ? 'EXTERNAL' : 'INTERNAL'),
       permissions: ROLE_PERMISSIONS[role] || [],
+      isSystemAdmin
     };
   } catch (error) {
     console.error('Error parsing Keycloak token:', error);

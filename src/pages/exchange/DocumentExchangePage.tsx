@@ -37,11 +37,13 @@ import {
 } from '../../sections/interoperability/components';
 import { documentsApi } from '../../services/documentsApi';
 import { dmCategoryApi } from '../../services/dmCategoryApi';
+import { getDefaultDateRange } from '../../services/getDefaultDateRange';
 import useLoading from '../../hooks/useLoading';
 import { isApiSuccess } from '../../utils/axios';
 import DocumentExchangeDetailDialog from './DocumentExchangeDetailDialog';
 import DocumentExchangeCreateDialog from './DocumentExchangeCreateDialog';
 import { ACK_SUCCESS_STATUSES, FAILED_STATUSES, getDocumentStatusNote } from '../../utils/constants';
+import { useAuthContext } from '../../auth/useAuthContext';
 
 function TransactionActionsMenu({
   tx,
@@ -158,18 +160,67 @@ const emptyForm: ExchangeTransaction = {
   errorDetail: '',
 };
 
-export default function DocumentExchangePage() {
+interface DocumentExchangePageProps {
+  defaultRoleFilter?: 'ALL' | 'SENDER' | 'RECEIVER';
+  pageTitle?: string;
+}
+
+export default function DocumentExchangePage({
+  defaultRoleFilter = 'ALL',
+  pageTitle,
+}: DocumentExchangePageProps) {
+  const { user } = useAuthContext();
+  console.log("user",user);
   const [list, setList] = useState<ExchangeTransaction[]>([]);
   const [keyword, setKeyword] = useState('');
   const [openForm, setOpenForm] = useState(false);
   const [detailTx, setDetailTx] = useState<ExchangeTransaction | null>(null);
+  const [pageIndex, setPageIndex] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [roleFilter, setRoleFilter] = useState<'ALL' | 'SENDER' | 'RECEIVER'>(defaultRoleFilter);
+
+  const defaultDates = useMemo(() => getDefaultDateRange(), []);
+  const [startDate, setStartDate] = useState(defaultDates.startDateStr);
+  const [endDate, setEndDate] = useState(defaultDates.endDateStr);
 
   const { enqueueSnackbar } = useSnackbar();
   const { showLoading, hideLoading } = useLoading();
 
+  const currentUnitCode = useMemo(() => {
+    if (!user) return '';
+    const val = user.unitCode || user.org || user.agencyCode || (user.username ? user.username.split('.')[0] : '');
+    return String(val || '').toUpperCase().trim();
+  }, [user]);
+
+
+  const isSystemAdmin = Boolean(user?.isSystemAdmin);
+
+  useEffect(() => {
+    if (isSystemAdmin) {
+      setRoleFilter('ALL');
+    } else if (defaultRoleFilter === 'ALL') {
+      setRoleFilter('SENDER');
+    } else {
+      setRoleFilter(defaultRoleFilter);
+    }
+  }, [defaultRoleFilter, isSystemAdmin]);
+
   const fetchTransactions = useCallback(async () => {
     try {
-      const res = await documentsApi.getRoutes({});
+      const searchField: Record<string, any> = {};
+      if (roleFilter === 'SENDER' && currentUnitCode) {
+        searchField.SENDER_CODE = currentUnitCode;
+      } else if (roleFilter === 'RECEIVER' && currentUnitCode) {
+        searchField.RECEIVER_CODE = currentUnitCode;
+      }
+
+      const res = await documentsApi.getRoutes({
+        PageIndex: pageIndex,
+        PageSize: pageSize,
+        SearchField: searchField,
+        cdateStart: startDate ? `${startDate} 00:00:00` : defaultDates.cdateStart,
+        cdateEnd: endDate ? `${endDate} 23:59:59` : defaultDates.cdateEnd,
+      });
       const rawData = res?.Data || res?.data || (Array.isArray(res) ? res : []);
       if (rawData && Array.isArray(rawData)) {
         const groupMap = new Map<string, any>();
@@ -254,7 +305,7 @@ export default function DocumentExchangePage() {
     } catch {
       // ignore
     }
-  }, []);
+  }, [pageIndex, pageSize, roleFilter, currentUnitCode, startDate, endDate, defaultDates]);
 
   useEffect(() => {
     fetchTransactions();
@@ -318,18 +369,19 @@ export default function DocumentExchangePage() {
 
 
 
-  const filtered = useMemo(
-    () =>
-      list.filter(
-        (tx) =>
-          String(tx.id || tx.code || '').toLowerCase().includes(keyword.toLowerCase()) ||
-          (tx.documentCode || '').toLowerCase().includes(keyword.toLowerCase()) ||
-          (tx.documentTitle || '').toLowerCase().includes(keyword.toLowerCase()) ||
-          (tx.sender || '').toLowerCase().includes(keyword.toLowerCase()) ||
-          (tx.receiver || '').toLowerCase().includes(keyword.toLowerCase())
-      ),
-    [list, keyword]
-  );
+  const filtered = useMemo(() => {
+    if (!keyword.trim()) return list;
+    const kw = keyword.toLowerCase().trim();
+    return list.filter((tx) => {
+      return (
+        String(tx.id || tx.code || '').toLowerCase().includes(kw) ||
+        (tx.documentCode || '').toLowerCase().includes(kw) ||
+        (tx.documentTitle || '').toLowerCase().includes(kw) ||
+        (tx.sender || '').toLowerCase().includes(kw) ||
+        (tx.receiver || '').toLowerCase().includes(kw)
+      );
+    });
+  }, [list, keyword]);
 
 
   function handleDelete(id: string | number) {
@@ -382,13 +434,13 @@ export default function DocumentExchangePage() {
     const receivers: { code: string; name: string; status: string }[] =
       tx.routes && tx.routes.length > 0
         ? tx.routes.map((r: any) => ({
-            code: r.receiverCode || r.code || '',
-            name: r.receiverName || r.receiverCode || '',
-            status: r.status || 'WAITING',
-          }))
+          code: r.receiverCode || r.code || '',
+          name: r.receiverName || r.receiverCode || '',
+          status: r.status || 'WAITING',
+        }))
         : Array.isArray(tx.receiverCode)
-        ? tx.receiverCode.map((c) => ({ code: c, name: c, status: 'WAITING' }))
-        : [{ code: String(tx.receiverCode || ''), name: String(tx.receiver || ''), status: 'WAITING' }];
+          ? tx.receiverCode.map((c) => ({ code: c, name: c, status: 'WAITING' }))
+          : [{ code: String(tx.receiverCode || ''), name: String(tx.receiver || ''), status: 'WAITING' }];
 
     if (receivers.length <= 1) {
       executeAck(tx, receivers[0]?.code || '');
@@ -407,10 +459,10 @@ export default function DocumentExchangePage() {
     const rCodes: string[] = Array.isArray(formValues.receiverCode)
       ? formValues.receiverCode
       : typeof formValues.receiverCode === 'string' && formValues.receiverCode
-      ? (formValues.receiverCode as string).split(',').map((s) => s.trim()).filter(Boolean)
-      : typeof formValues.receiver === 'string' && formValues.receiver
-      ? (formValues.receiver as string).split(',').map((s) => s.trim()).filter(Boolean)
-      : [];
+        ? (formValues.receiverCode as string).split(',').map((s) => s.trim()).filter(Boolean)
+        : typeof formValues.receiver === 'string' && formValues.receiver
+          ? (formValues.receiver as string).split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
     const subj = formValues.subject || formValues.documentTitle;
 
     if (!docNo || !sCode || rCodes.length === 0) {
@@ -446,74 +498,157 @@ export default function DocumentExchangePage() {
     }
   }
 
-  const tableRows = filtered.map((tx, index) => ({
-    stt: (
-      <Typography
-        variant="body2"
-        align="center"
-        sx={{ cursor: 'pointer', color: 'primary.main', fontWeight: 600 }}
-        onClick={() => { setDetailTx(tx); }}
-      >
-        {index + 1}
-      </Typography>
-    ),
-    documentCode: (
-      <Stack>
-        <Typography variant="body2" fontWeight={600}>{tx.documentCode}</Typography>
-        {tx.documentTitle && (
-          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {tx.documentTitle}
-          </Typography>
-        )}
-      </Stack>
-    ),
-    sender: (
-      <Stack>
-        <Typography variant="body2">{tx.sender}</Typography>
-        {tx.senderPerson && (
-          <Typography variant="caption" color="text.secondary">{tx.senderPerson}</Typography>
-        )}
-      </Stack>
-    ),
-    receiver: (
-      <Stack spacing={0.5} alignItems="flex-start" sx={{ py: 0.5 }}>
-        {tx.routes && tx.routes.length > 0 ? (
-          tx.routes.map((r: any, idx: number) => {
-            const sUpper = (r.status || '').toUpperCase();
-            const isAck = ACK_SUCCESS_STATUSES.includes(sUpper);
-            const isFailed = FAILED_STATUSES.includes(sUpper);
-            const color = isAck ? 'success' : isFailed ? 'error' : 'warning';
-            const icon = isAck ? 'solar:check-circle-bold' : isFailed ? 'solar:danger-bold' : 'solar:clock-circle-bold';
-            const statusText = getDocumentStatusNote(r.status);
+  const tableRows = filtered.map((tx, index) => {
+    const sCodeUpper = (tx.senderCode || tx.sender || '').toUpperCase();
+    const isMySender = Boolean(currentUnitCode && (sCodeUpper === currentUnitCode || sCodeUpper.includes(currentUnitCode) || currentUnitCode.includes(sCodeUpper)));
 
-            return (
-              <Chip
-                key={r.id || idx}
-                icon={<Iconify icon={icon} width={13} />}
-                label={`${r.receiverName || r.receiverCode} (${statusText})`}
-                size="small"
-                color={color}
-                variant="soft"
-                sx={{ height: 22, fontSize: '0.725rem', fontWeight: 600 }}
-              />
-            );
-          })
-        ) : (
-          <Typography variant="body2">{tx.receiver || '—'}</Typography>
-        )}
-      </Stack>
-    ),
-    sentAt: <Typography variant="caption">{tx.sentAt || tx.updatedAt}</Typography>,
-    actions: (
-      <TransactionActionsMenu
-        tx={tx}
-        onDetail={() => { setDetailTx(tx); }}
-        onReplay={() => handleReplay(tx.id || tx.code || '')}
-        onDelete={() => handleDelete(tx.id || tx.code || '')}
-        onAck={() => handleAck(tx)}
-      />
-    ),
-  }));
+    const routeCodes = tx.routes?.map((r: any) => (r.receiverCode || r.receiverName || '').toUpperCase()) || [];
+    const receiverCodes = Array.isArray(tx.receiverCode) ? tx.receiverCode.map((c: string) => String(c).toUpperCase()) : [(tx.receiver || '').toUpperCase()];
+    const allReceivers = [...routeCodes, ...receiverCodes];
+    const isMyReceiver = Boolean(currentUnitCode && allReceivers.some((rc) => rc === currentUnitCode || rc.includes(currentUnitCode) || currentUnitCode.includes(rc)));
+
+    return {
+      stt: (
+        <Typography onClick={() => setDetailTx(tx)}>
+          {index + 1}
+        </Typography>
+      ),
+      exchangeType: (
+        <Stack alignItems="center">
+          {isMySender && !isMyReceiver && (
+            <Chip
+              icon={<Iconify icon="solar:export-bold" width={13} />}
+              label="Gửi đi"
+              size="small"
+              color="warning"
+              variant="soft"
+              sx={{ height: 24, fontSize: '0.725rem', fontWeight: 700, px: 0.5 }}
+            />
+          )}
+          {isMyReceiver && !isMySender && (
+            <Chip
+              icon={<Iconify icon="solar:import-bold" width={13} />}
+              label="Nhận về"
+              size="small"
+              color="info"
+              variant="soft"
+              sx={{ height: 24, fontSize: '0.725rem', fontWeight: 700, px: 0.5 }}
+            />
+          )}
+          {isMySender && isMyReceiver && (
+            <Chip
+              icon={<Iconify icon="solar:transfer-horizontal-bold" width={13} />}
+              label="Gửi & Nhận"
+              size="small"
+              color="secondary"
+              variant="soft"
+              sx={{ height: 24, fontSize: '0.725rem', fontWeight: 700, px: 0.5 }}
+            />
+          )}
+          {!isMySender && !isMyReceiver && (
+            <Chip
+              icon={<Iconify icon="solar:transfer-horizontal-bold" width={13} />}
+              label="Liên thông"
+              size="small"
+              color="default"
+              variant="soft"
+              sx={{ height: 24, fontSize: '0.725rem', fontWeight: 600, px: 0.5 }}
+            />
+          )}
+        </Stack>
+      ),
+      documentCode: (
+        <Stack spacing={0.3}>
+          <Typography
+            variant="subtitle2"
+            sx={{
+              fontWeight: 700,
+              color: 'primary.main',
+              cursor: 'pointer',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+            onClick={() => setDetailTx(tx)}
+          >
+            {tx.documentCode}
+          </Typography>
+          {tx.documentTitle && (
+            <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {tx.documentTitle}
+            </Typography>
+          )}
+        </Stack>
+      ),
+      sender: (
+        <Stack spacing={0.3} alignItems="flex-start">
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: isMySender ? 'warning.main' : 'text.primary' }}>
+              {tx.sender || tx.senderCode || '—'}
+            </Typography>
+          </Stack>
+          {tx.senderPerson && (
+            <Typography variant="caption" color="text.secondary">
+              {tx.senderPerson} {tx.senderTitle ? `(${tx.senderTitle})` : ''}
+            </Typography>
+          )}
+        </Stack>
+      ),
+      receiver: (
+        <Stack spacing={0.75} alignItems="flex-start" sx={{ py: 0.5 }}>
+          {tx.routes && tx.routes.length > 0 ? (
+            tx.routes.map((r: any, idx: number) => {
+              const rCodeUpper = (r.receiverCode || r.receiverName || '').toUpperCase();
+              const isMyUnitReceiver = Boolean(currentUnitCode && (rCodeUpper === currentUnitCode || rCodeUpper.includes(currentUnitCode) || currentUnitCode.includes(rCodeUpper)));
+              const sUpper = (r.status || '').toUpperCase();
+              const isAck = ACK_SUCCESS_STATUSES.includes(sUpper);
+              const isFailed = FAILED_STATUSES.includes(sUpper);
+              const statusColor = isAck ? 'success' : isFailed ? 'error' : 'warning';
+              const statusIcon = isAck ? 'solar:check-circle-bold' : isFailed ? 'solar:danger-bold' : 'solar:clock-circle-bold';
+              const statusText = getDocumentStatusNote(r.status);
+
+              return (
+                <Stack key={r.id || idx} spacing={0.3} alignItems="flex-start">
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: isMyUnitReceiver ? 'info.main' : 'text.primary' }}>
+                    {r.receiverName || r.receiverCode}
+                  </Typography>
+                  <Chip
+                    icon={<Iconify icon={statusIcon} width={12} />}
+                    label={statusText}
+                    size="small"
+                    color={statusColor}
+                    variant="soft"
+                    sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600 }}
+                  />
+                </Stack>
+              );
+            })
+          ) : (
+            <Typography variant="body2">{tx.receiver || '—'}</Typography>
+          )}
+        </Stack>
+      ),
+      sentAt: (
+        <Stack spacing={0.2}>
+          <Typography variant="caption" fontWeight={600} color="text.primary">
+            {tx.sentAt || tx.updatedAt || '—'}
+          </Typography>
+          {tx.priority && (
+            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.675rem' }}>
+              Ưu tiên: {tx.priority}
+            </Typography>
+          )}
+        </Stack>
+      ),
+      actions: (
+        <TransactionActionsMenu
+          tx={tx}
+          onDetail={() => { setDetailTx(tx); }}
+          onReplay={() => handleReplay(tx.id || tx.code || '')}
+          onDelete={() => handleDelete(tx.id || tx.code || '')}
+          onAck={() => handleAck(tx)}
+        />
+      ),
+    };
+  });
 
   const stats = {
     total: list.length,
@@ -523,10 +658,17 @@ export default function DocumentExchangePage() {
     waiting: list.filter((tx) => tx.ack === 'WAITING').length,
   };
 
+  const currentTitle = pageTitle || (roleFilter === 'SENDER' ? 'Văn bản đi' : roleFilter === 'RECEIVER' ? 'Văn bản đến' : 'Trao đổi văn bản');
+  const currentSubtitle = roleFilter === 'SENDER'
+    ? 'Theo dõi danh sách văn bản liên thông gửi đi từ đơn vị của bạn.'
+    : roleFilter === 'RECEIVER'
+    ? 'Theo dõi danh sách văn bản liên thông nhận về từ các đơn vị khác.'
+    : 'Theo dõi hành trình giao nhận văn bản: gửi từ đâu, qua route nào, đến ai, ACK ra sao, có retry hay phát sinh lỗi không.';
+
   return (
     <PageShell
-      title="Document Exchange"
-      subtitle="Theo dõi hành trình giao nhận văn bản: gửi từ đâu, qua route nào, đến ai, ACK ra sao, có retry hay phát sinh lỗi không."
+      title={currentTitle}
+      subtitle={currentSubtitle}
     >
 
       {/* ── Metrics ── */}
@@ -548,7 +690,23 @@ export default function DocumentExchangePage() {
         }
       >
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {currentTitle}
+            </Typography>
+
+            {currentUnitCode && (
+              <Chip
+                icon={<Iconify icon="solar:user-id-bold" width={16} />}
+                label={`Đơn vị tài khoản: ${currentUnitCode}`}
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, fontSize: '0.8rem' }}
+              />
+            )}
+          </Stack>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
             <TextField
               size="small"
               label="Tìm giao dịch"
@@ -557,11 +715,30 @@ export default function DocumentExchangePage() {
               placeholder="Transaction ID, văn bản, nơi gửi, nơi nhận..."
               fullWidth
             />
+            <TextField
+              size="small"
+              type="date"
+              label="Từ ngày"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Đến ngày"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
           </Stack>
 
           <DataTable
             columns={[
-              { key: 'stt', label: 'STT', align: 'center', width: 60 },
+              { key: 'stt', label: 'STT', align: 'center', width: 50 },
+              { key: 'exchangeType', label: 'Loại giao dịch', align: 'center', width: 130 },
               { key: 'documentCode', label: 'Văn bản' },
               { key: 'sender', label: 'Nơi gửi' },
               { key: 'receiver', label: 'Nơi nhận' },

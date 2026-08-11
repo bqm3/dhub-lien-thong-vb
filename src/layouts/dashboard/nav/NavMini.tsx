@@ -16,7 +16,7 @@ import filterNavByPermission from './filterNavByPermission';
 
 export default function NavMini() {
   const { user } = useAuthContext();
-  const filteredNavConfig = filterNavByPermission(navConfig, user?.permissions);
+  const filteredNavConfig = filterNavByPermission(navConfig, user?.permissions, user);
 
   return (
     <Box

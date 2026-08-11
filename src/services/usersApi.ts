@@ -1,5 +1,5 @@
 import axiosInstance from '../utils/axios';
-import { getDefaultDateRange } from './getDefaultDateRange';
+import { BaseSearchRequest, buildBaseBody } from './types';
 
 export interface UserItem {
   id?: number;
@@ -24,27 +24,15 @@ export interface UserItem {
   luser?: string;
 }
 
-export interface UserSearchRequest {
-  pageIndex?: number;
-  pageSize?: number;
-  searchField?: Record<string, any>;
-  cdateStart?: string;
-  cdateEnd?: string;
-}
+export type UserSearchRequest = BaseSearchRequest;
 
 export const usersApi = {
   /**
    * Lấy danh sách USERS theo tìm kiếm & phân trang từ Backend / Database
    */
   async getList(params: UserSearchRequest = {}) {
-    const defaultDates = getDefaultDateRange();
-    const response = await axiosInstance.post('/USERS/GetList', {
-      PageIndex: params.pageIndex || 1,
-      PageSize: params.pageSize || 100,
-      SearchField: params.searchField || {},
-      CDATE_START: params.cdateStart || defaultDates.cdateStart,
-      CDATE_END: params.cdateEnd || defaultDates.cdateEnd,
-    });
+    const body = buildBaseBody(params);
+    const response = await axiosInstance.post('/USERS/GetList', body);
     return response.data;
   },
 
@@ -75,7 +63,7 @@ export const usersApi = {
       AVATAR: item.avatar || '',
       IS_ACTIVE: item.isActive !== undefined ? item.isActive : 1,
       STATUS: item.status !== undefined ? item.status : 1,
-      ORG: item.org || 'SYSTEM',
+      ORG: item.org || item.unitCode || item.unitName || '',
       REMOVED: item.isDelete || 0,
     };
     const response = await axiosInstance.post('/USERS/Create', payload);

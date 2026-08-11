@@ -1,5 +1,5 @@
 import axiosInstance from '../utils/axios';
-import { getDefaultDateRange } from './getDefaultDateRange';
+import { BaseSearchRequest, buildBaseBody } from './types';
 
 export interface DMCategoryItem {
   id?: number;
@@ -18,18 +18,7 @@ export interface DMCategoryItem {
   luser?: string;
 }
 
-export interface DMCategorySearchRequest {
-  pageIndex?: number;
-  pageSize?: number;
-  searchField?: Record<string, any>;
-  cdateStart?: string;
-  cdateEnd?: string;
-}
-
-/**
- * Trả về dải ngày mặc định: cdateStart = hiện tại - 1 năm, cdateEnd = ngày hiện tại (yyyy-MM-dd)
- */
-
+export type DMCategorySearchRequest = BaseSearchRequest;
 
 /**
  * Service API cho Danh mục / Đơn vị / Phân quyền (DM_CATEGORYController)
@@ -39,14 +28,8 @@ export const dmCategoryApi = {
    * Lấy danh sách DM_CATEGORY theo tìm kiếm & phân trang
    */
   async getList(params: DMCategorySearchRequest = {}) {
-    const defaultDates = getDefaultDateRange();
-    const response = await axiosInstance.post('/DM_CATEGORY/GetList', {
-      PageIndex: params.pageIndex || 1,
-      PageSize: params.pageSize || 100,
-      SearchField: params.searchField || {},
-      CDATE_START: params.cdateStart || defaultDates.cdateStart,
-      CDATE_END: params.cdateEnd || defaultDates.cdateEnd,
-    });
+    const body = buildBaseBody(params);
+    const response = await axiosInstance.post('/DM_CATEGORY/GetList', body);
     return response.data;
   },
 

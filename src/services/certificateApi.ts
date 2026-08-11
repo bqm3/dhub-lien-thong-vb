@@ -1,5 +1,5 @@
 import axiosInstance from '../utils/axios';
-import { getDefaultDateRange } from './getDefaultDateRange';
+import { BaseSearchRequest, buildBaseBody } from './types';
 
 export interface CertificateItem {
   id?: number;
@@ -24,13 +24,7 @@ export interface CertificateItem {
   luser?: string;
 }
 
-export interface CertificateSearchRequest {
-  pageIndex?: number;
-  pageSize?: number;
-  searchField?: Record<string, any>;
-  cdateStart?: string;
-  cdateEnd?: string;
-}
+export type CertificateSearchRequest = BaseSearchRequest;
 
 export const certificateApi = {
   /**
@@ -54,14 +48,8 @@ export const certificateApi = {
    * Lấy danh sách CERTIFICATE theo tìm kiếm & phân trang
    */
   async getList(params: CertificateSearchRequest = {}) {
-    const defaultDates = getDefaultDateRange();
-    const response = await axiosInstance.post('/CERTIFICATE/GetList', {
-      PageIndex: params.pageIndex || 1,
-      PageSize: params.pageSize || 100,
-      SearchField: params.searchField || {},
-      CDATE_START: params.cdateStart || defaultDates.cdateStart,
-      CDATE_END: params.cdateEnd || defaultDates.cdateEnd,
-    });
+    const body = buildBaseBody(params);
+    const response = await axiosInstance.post('/CERTIFICATE/GetList', body);
     return response.data;
   },
 
