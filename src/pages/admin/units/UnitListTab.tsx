@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -8,10 +9,21 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   Grid,
   IconButton,
+  InputAdornment,
   MenuItem,
+  Paper,
   Stack,
+  Switch,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -19,30 +31,23 @@ import {
 import Iconify from '../../../components/iconify';
 import { DataTable, GridRow, MetricCard, SectionCard } from '../../../sections/interoperability/components';
 import { dmCategoryApi, DMCategoryItem } from '../../../services/dmCategoryApi';
+import { sysShareCorpTokenApi, sysShareServicesApi, SysShareCorpTokenItem, SysShareServiceItem } from '../../../services/sysShareApi';
 import { getDefaultDateRange } from '../../../services/getDefaultDateRange';
 import { formatTime } from '../../../utils/formatTime';
 import { isApiSuccess } from '../../../utils/axios';
 import useLoading from '../../../hooks/useLoading';
-
-type UnitRecord = {
-  code: string;
-  numericId?: number;
-  name: string;
-  parent: string;
-  description: string;
-  status: 'Active' | 'Inactive';
-  updatedAt: string;
-};
+import UnitApiModal from './UnitApiModal';
+import { exportUnitIntegrationDocx } from '../../../utils/exportUnitDocx';
 
 const DEFAULT_PARENT_CODE = 'DON_VI';
 
-const emptyForm: UnitRecord = {
+const emptyForm: DMCategoryItem = {
   code: '',
   name: '',
-  parent: DEFAULT_PARENT_CODE,
+  parentCode: DEFAULT_PARENT_CODE,
   description: '',
-  status: 'Active',
-  updatedAt: '',
+  isActive: 1,
+  status: 1,
 };
 
 interface UnitListTabProps {
@@ -53,8 +58,8 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
   const { showLoading, hideLoading } = useLoading();
   const queryClient = useQueryClient();
   const defaultDates = useMemo(() => getDefaultDateRange(), []);
-  const [cdateStart, setCdateStart] = useState(defaultDates.cdateStart);
-  const [cdateEnd, setCdateEnd] = useState(defaultDates.cdateEnd);
+  const [cdateStart, setCdateStart] = useState(defaultDates.startDateStr);
+  const [cdateEnd, setCdateEnd] = useState(defaultDates.endDateStr);
   const [parentCodeFilter, setParentCodeFilter] = useState(DEFAULT_PARENT_CODE);
 
   // Pagination states - Units
@@ -65,54 +70,27 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
   // Modals state
   const [openEditor, setOpenEditor] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState<UnitRecord>(emptyForm);
+  const [formValues, setFormValues] = useState<DMCategoryItem>(emptyForm);
   const [deletingCode, setDeletingCode] = useState<string | null>(null);
 
-  // Query danh sách nhóm cha để làm options cho Select
-  const { data: parentCategories = [] } = useQuery<{ code: string; label: string }[]>({
-    queryKey: ['parentCategoryOptions'],
-    queryFn: async () => {
-      const res = await dmCategoryApi.getList({ pageIndex: 1, pageSize: 500 });
-      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
-      if (!rawList) return [];
-      const options: { code: string; label: string }[] = [];
-      const seen = new Set<string>();
-      rawList.forEach((item: any) => {
-        const code = item.CODE || item.code;
-        const name = item.NAME || item.name;
-        if (code && !seen.has(code)) {
-          seen.add(code);
-          options.push({ code, label: name ? `${code} - ${name}` : code });
-        }
-      });
-      return options;
-    },
-  });
+  // API Modal State
+  const [apiModalUnit, setApiModalUnit] = useState<DMCategoryItem | null>(null);
+
+
 
   // TanStack Query: Fetch Units
-  const { data, isFetching, refetch } = useQuery<{ rows: UnitRecord[]; total: number }>({
+  const { data, isFetching, refetch } = useQuery<{ rows: DMCategoryItem[]; total: number }>({
     queryKey: ['units', pageIndex, pageSize, cdateStart, cdateEnd, parentCodeFilter],
     queryFn: async () => {
-      const res = await dmCategoryApi.getList({
+      const res = await dmCategoryApi.getUnitList({
         pageIndex,
         pageSize,
-        cdateStart,
-        cdateEnd,
-        searchField: parentCodeFilter ? { PARENT_CODE: parentCodeFilter } : {},
+        cdateStart: cdateStart ? (cdateStart.includes(':') ? cdateStart : `${cdateStart} 00:00:00`) : '',
+        cdateEnd: cdateEnd ? (cdateEnd.includes(':') ? cdateEnd : `${cdateEnd} 23:59:59`) : '',
       });
-      const rawList = res?.Data || res?.data || (Array.isArray(res) ? res : []);
-      const total = res?.TotalRecords ?? res?.totalRecords ?? res?.TotalCount ?? res?.totalCount ?? (rawList ? rawList.length : 0);
-      if (!rawList) return { rows: [], total: 0 };
-      const mapped: UnitRecord[] = rawList.map((item: any) => ({
-        code: item.CODE || item.code || '',
-        numericId: item.ID || item.id,
-        name: item.NAME || item.name || '',
-        parent: item.PARENT_CODE || item.parentCode || parentCodeFilter,
-        description: item.DESCRIPTION || item.description || '',
-        status: (item.IS_ACTIVE !== undefined ? item.IS_ACTIVE : item.isActive) === 1 ? 'Active' : 'Inactive',
-        updatedAt: formatTime(item.CDATE || item.cdate || item.createdDate || item.CREATED_DATE),
-      }));
-      return { rows: mapped, total };
+      const rows: DMCategoryItem[] = res?.Data || res?.data || (Array.isArray(res) ? res : []);
+      const total: number = res?.TotalRecords ?? res?.totalRecords ?? rows.length;
+      return { rows, total };
     },
     placeholderData: keepPreviousData,
   });
@@ -152,36 +130,47 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
     const q = keyword.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter(
-      (unit: UnitRecord) =>
-        unit.description.toLowerCase().includes(q) ||
-        unit.code.toLowerCase().includes(q) ||
-        unit.name.toLowerCase().includes(q) ||
-        unit.parent.toLowerCase().includes(q) ||
-        unit.status.toLowerCase().includes(q)
+      (unit: DMCategoryItem) =>
+        (unit.description || '').toLowerCase().includes(q) ||
+        (unit.code || '').toLowerCase().includes(q) ||
+        (unit.name || '').toLowerCase().includes(q) ||
+        (unit.parentCode || (unit as any).parent || '').toLowerCase().includes(q)
     );
   }, [keyword, rows]);
 
-  const tableRows = filtered.map((unit: UnitRecord) => {
-    const parentOpt = parentCategories.find((p) => p.code === unit.parent);
-    const parentDisplay = unit.parent && unit.parent !== '0'
-      ? (parentOpt ? parentOpt.label : unit.parent)
-      : '—';
+  const handleOpenApiModal = (unit: DMCategoryItem) => {
+    setApiModalUnit(unit);
+  };
+
+  const tableRows = filtered.map((unit: DMCategoryItem) => {
+    const parentCode = unit.parentCode || (unit as any).parent;
+    const parentDisplay = parentCode && parentCode !== '0' ? parentCode : '—';
+    const isAct = unit.isActive === 1 || unit.status === 1 || (unit as any).status === 'Active';
 
     return {
       code: <Typography variant="body2" sx={{ fontWeight: 700 }}>{unit.code}</Typography>,
       name: unit.name,
-      parent: unit.parent && unit.parent !== '0' ? (
+      parent: parentCode && parentCode !== '0' ? (
         <Chip label={parentDisplay} size="small" variant="soft" color="info" />
       ) : (
         <Typography variant="body2" color="text.disabled">—</Typography>
       ),
       description: unit.description || '—',
-      status: unit.status === 'Active' ? 'Hoạt động' : 'Ngưng dùng',
-      updatedAt: formatTime(unit.updatedAt),
+      status: isAct ? 'Hoạt động' : 'Ngưng dùng',
+      updatedAt: formatTime(unit.cdate || (unit as any).updatedAt || new Date()),
       actions: (
         <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+          <Tooltip title="Cấp bộ thông tin kết nối API & Tải DOCX hướng dẫn">
+            <IconButton
+              size="small"
+              color="secondary"
+              onClick={() => handleOpenApiModal(unit)}
+            >
+              <Iconify icon="solar:key-minimalistic-bold" />
+            </IconButton>
+          </Tooltip>
           {onOpenCertForUnit && (
-            <Tooltip title="Quản lý Chữ ký số / Kết nối">
+            <Tooltip title="Quản lý Chữ ký số / PKI">
               <IconButton
                 size="small"
                 color="info"
@@ -211,13 +200,12 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
     setFormValues({
       ...emptyForm,
       code: `${DEFAULT_PARENT_CODE}_${String(Date.now()).slice(-6)}`,
-      parent: parentCodeFilter || DEFAULT_PARENT_CODE,
-      updatedAt: formatTime(new Date()),
+      parentCode: parentCodeFilter || DEFAULT_PARENT_CODE,
     });
     setOpenEditor(true);
   }
 
-  function handleEdit(unit: UnitRecord) {
+  function handleEdit(unit: DMCategoryItem) {
     setEditingCode(unit.code);
     setFormValues(unit);
     setOpenEditor(true);
@@ -227,12 +215,12 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
     if (!formValues.code || !formValues.name) return;
 
     const apiItem: DMCategoryItem = {
-      id: formValues.numericId,
+      id: formValues.id || (formValues as any).numericId,
       code: formValues.code,
       name: formValues.name,
-      parentCode: formValues.parent || parentCodeFilter || DEFAULT_PARENT_CODE,
-      description: formValues.description,
-      isActive: formValues.status === 'Active' ? 1 : 0,
+      parentCode: formValues.parentCode || (formValues as any).parent || parentCodeFilter || DEFAULT_PARENT_CODE,
+      description: formValues.description || '',
+      isActive: (formValues.isActive !== undefined ? formValues.isActive : (formValues as any).status === 'Active') ? 1 : 0,
       status: 1,
     };
 
@@ -241,10 +229,10 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
 
   function handleConfirmDelete() {
     if (!deletingCode) return;
-    const target = rows.find((r: UnitRecord) => r.code === deletingCode);
+    const target = rows.find((r: DMCategoryItem) => r.code === deletingCode);
 
-    if (target?.numericId) {
-      deleteMutation.mutate(target.numericId);
+    if (target?.id || (target as any)?.numericId) {
+      deleteMutation.mutate((target?.id || (target as any)?.numericId)!);
     } else {
       setDeletingCode(null);
     }
@@ -262,21 +250,21 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
         />
         <MetricCard
           label="Đang hoạt động"
-          value={rows.filter((u: UnitRecord) => u.status === 'Active').length}
+          value={rows.filter((u: DMCategoryItem) => u.isActive === 1 || u.status === 1 || (u as any).status === 'Active').length}
           helper="Đang kết nối liên thông"
           icon="solar:shield-check-bold"
           backgroundColor="#028EDD"
         />
         <MetricCard
           label="Ngưng hoạt động"
-          value={rows.filter((u: UnitRecord) => u.status === 'Inactive').length}
+          value={rows.filter((u: DMCategoryItem) => (u.isActive !== undefined ? u.isActive === 0 : (u as any).status === 'Inactive')).length}
           helper="Ngưng kết nối"
           icon="solar:shield-warning-bold"
           backgroundColor="#9E50FE"
         />
         <MetricCard
           label="Nhóm đơn vị"
-          value={new Set(rows.map((u: UnitRecord) => u.parent)).size}
+          value={new Set(rows.map((u: DMCategoryItem) => u.parentCode || (u as any).parent)).size}
           helper="Phân nhóm theo đơn vị cha"
           icon="solar:category-bold"
           backgroundColor="#FF8551"
@@ -320,9 +308,10 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
               sx={{ minWidth: 200 }}
             >
               <MenuItem value="">Tất cả nhóm cha</MenuItem>
-              {parentCategories.map((opt) => (
+              <MenuItem value="DON_VI">DON_VI - Danh mục Đơn vị</MenuItem>
+              {rows.map((opt) => (
                 <MenuItem key={opt.code} value={opt.code}>
-                  {opt.label}
+                  {opt.code} - {opt.name}
                 </MenuItem>
               ))}
             </TextField>
@@ -406,14 +395,14 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
                 label="Mã nhóm cha"
                 select
                 InputLabelProps={{ shrink: true }}
-                value={formValues.parent || ''}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, parent: event.target.value }))}
+                value={formValues.parentCode || ''}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, parentCode: event.target.value }))}
                 SelectProps={{ displayEmpty: true }}
               >
-                <MenuItem value="">Không thuộc nhóm cha nào</MenuItem>
-                {parentCategories.map((opt) => (
+                <MenuItem value="DON_VI">DON_VI - Danh mục Đơn vị</MenuItem>
+                {rows.map((opt) => (
                   <MenuItem key={opt.code} value={opt.code}>
-                    {opt.label}
+                    {opt.code} - {opt.name}
                   </MenuItem>
                 ))}
               </TextField>
@@ -433,13 +422,13 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
                 fullWidth
                 label="Trạng thái"
                 select
-                value={formValues.status}
+                value={formValues.isActive !== undefined ? formValues.isActive : 1}
                 onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, status: event.target.value as UnitRecord['status'] }))
+                  setFormValues((prev) => ({ ...prev, isActive: Number(event.target.value) }))
                 }
               >
-                <MenuItem value="Active">Hoạt động</MenuItem>
-                <MenuItem value="Inactive">Ngưng hoạt động</MenuItem>
+                <MenuItem value={1}>Hoạt động</MenuItem>
+                <MenuItem value={0}>Ngưng hoạt động</MenuItem>
               </TextField>
             </Grid>
           </Grid>
@@ -467,6 +456,15 @@ export default function UnitListTab({ onOpenCertForUnit }: UnitListTabProps) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* API Connection & DOCX Export Dialog */}
+      <UnitApiModal
+        unit={apiModalUnit}
+        onClose={() => setApiModalUnit(null)}
+        cdateStart={cdateStart}
+        cdateEnd={cdateEnd}
+      />
     </Stack>
   );
 }
+

@@ -10,6 +10,7 @@ import {
   getKeycloakSSOUrl,
   exchangeKeycloakCode,
   parseKeycloakUser,
+  refreshKeycloakToken,
   getKeycloakLogoutUrl,
   logoutKeycloakSilent,
   KeycloakRealm,
@@ -94,11 +95,18 @@ type AuthProviderProps = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const buildDemoUser = (args?: { role?: DemoRole; agencyCode?: string; email?: string; name?: string }) => {
+  const buildDemoUser = (args?: {
+    role?: DemoRole;
+    agencyCode?: string;
+    email?: string;
+    name?: string;
+    isSystemAdmin?: boolean;
+  }): AuthUserType => {
     const role = args?.role ?? 'ADMIN';
     const email = args?.email ?? 'admin@local';
     const name = args?.name ?? 'System Admin';
     const agencyCode = args?.agencyCode ?? '';
+    const isSystemAdmin = args?.isSystemAdmin ?? false;
 
     const permissions = ROLE_PERMISSIONS[role] || [];
 
@@ -114,37 +122,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
       username: email,
       realm: 'INTERNAL',
       permissions,
+      isSystemAdmin,
     };
   };
 
   const initialize = useCallback(async () => {
     try {
-      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
+      let accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
+      const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : '';
+      const authRealm = (typeof window !== 'undefined' && localStorage.getItem('authRealm')) || 'INTERNAL';
 
-      if (accessToken && isValidToken(accessToken)) {
-        setSession(accessToken);
-
-        let user = parseKeycloakUser(accessToken);
-        if (!user) {
-          user = buildDemoUser({ role: 'ADMIN' });
+      if (accessToken) {
+        if (!isValidToken(accessToken) && refreshToken && authRealm !== 'LOCAL') {
+          try {
+            const res = await refreshKeycloakToken(refreshToken, authRealm);
+            if (res?.access_token) {
+              accessToken = res.access_token;
+              setSession(accessToken as string);
+              localStorage.setItem('accessToken', accessToken as string);
+              if (res.refresh_token) {
+                localStorage.setItem('refreshToken', res.refresh_token);
+              }
+              if (res.id_token) {
+                localStorage.setItem('idToken', res.id_token);
+              }
+            }
+          } catch (refreshErr) {
+            console.warn('Auto refresh token on initialize failed:', refreshErr);
+          }
         }
 
-        dispatch({
-          type: Types.INITIAL,
-          payload: {
-            isAuthenticated: true,
-            user,
-          },
-        });
-      } else {
-        dispatch({
-          type: Types.INITIAL,
-          payload: {
-            isAuthenticated: false,
-            user: null,
-          },
-        });
+        if (accessToken && isValidToken(accessToken)) {
+          setSession(accessToken);
+
+          let user: any = parseKeycloakUser(accessToken, authRealm);
+          if (!user) {
+            user = buildDemoUser({ role: 'ADMIN' });
+          }
+
+          dispatch({
+            type: Types.INITIAL,
+            payload: {
+              isAuthenticated: true,
+              user,
+            },
+          });
+          return;
+        }
       }
+
+      dispatch({
+        type: Types.INITIAL,
+        payload: {
+          isAuthenticated: false,
+          user: null,
+        },
+      });
     } catch (error) {
       console.error(error);
       dispatch({
@@ -156,6 +189,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
     }
   }, []);
+
 
   useEffect(() => {
     initialize();

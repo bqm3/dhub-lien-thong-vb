@@ -9,7 +9,6 @@ const Loadable = (Component: ElementType) => (props: any) => (
 
 export const LoginPage = Loadable(lazy(() => import('../pages/LoginPage')));
 
-export const IntegrationManagementPage = Loadable(lazy(() => import('../pages/integration/IntegrationManagementPage')));
 export const DocumentManagementPage = Loadable(lazy(() => import('../pages/documents/DocumentManagementPage')));
 export const DocumentExchangePage = Loadable(lazy(() => import('../pages/exchange/DocumentExchangePage')));
 

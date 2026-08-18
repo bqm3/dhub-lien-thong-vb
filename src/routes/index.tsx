@@ -9,7 +9,6 @@ import KeycloakCallbackPage from '../pages/auth/KeycloakCallbackPage';
 import InternalLoginRedirectPage from '../pages/auth/InternalLoginRedirectPage';
 import {
   Page404,
-  IntegrationManagementPage,
   DocumentExchangePage,
   LoginPage,
   DocumentManagementPage,

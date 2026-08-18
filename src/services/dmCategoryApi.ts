@@ -34,6 +34,36 @@ export const dmCategoryApi = {
   },
 
   /**
+   * Lấy danh sách Đơn vị (POST /DM_CATEGORY/GetListUnits)
+   */
+  async getUnitList(params: DMCategorySearchRequest = {}) {
+    const body = buildBaseBody(params);
+    const response = await axiosInstance.post('/DM_CATEGORY/GetListUnits', body);
+    const resData = response.data;
+    if (resData) {
+      const rawList = resData.Data || resData.data || (Array.isArray(resData) ? resData : null);
+      if (Array.isArray(rawList)) {
+        const normalized = rawList.map((item: any) => ({
+          ...item,
+          id: item.ID ?? item.id,
+          code: item.CODE ?? item.code ?? '',
+          name: item.NAME ?? item.name ?? '',
+          parentCode: item.PARENT_CODE ?? item.parentCode ?? '',
+          parentName: item.PARENT_NAME ?? item.parentName ?? '',
+          description: item.DESCRIPTION ?? item.description ?? '',
+          isActive: item.IS_ACTIVE !== undefined ? Number(item.IS_ACTIVE) : (item.isActive !== undefined ? Number(item.isActive) : 1),
+          status: item.STATUS !== undefined ? Number(item.STATUS) : (item.status !== undefined ? Number(item.status) : 1),
+          org: item.ORG ?? item.org ?? '',
+          cdate: item.CDATE ?? item.cdate ?? '',
+        }));
+        if (resData.Data) resData.Data = normalized;
+        if (resData.data) resData.data = normalized;
+      }
+    }
+    return resData;
+  },
+
+  /**
    * Lấy chi tiết thông tin DM_CATEGORY theo ID
    */
   async getInfo(id: number) {

@@ -6,7 +6,7 @@ import { PATH_DASHBOARD } from './routes/paths';
 
 export const HOST_API_KEY = import.meta.env.REACT_APP_HOST_API_KEY || 'http://localhost:8800/api';
 
-export const BUCKET_MINIO = import.meta.env.VITE_BUCKET_MINIO 
+export const BUCKET_MINIO = import.meta.env.VITE_BUCKET_MINIO;
 
 export const FIREBASE_API = {
   apiKey: import.meta.env.REACT_APP_FIREBASE_API_KEY,
